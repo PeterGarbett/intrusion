@@ -1,0 +1,19 @@
+#
+#	This file needs to be on /etc/systemd/system/
+#	Restart is chosen because we terminate only
+#	on failure where we kill our own children and exit
+#	and expect tshito restart us	
+#
+[Unit]
+Description=motion triggered snapshots
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/intrusion.py
+User=peter
+Restart=always
+RestartSec=50s
+
+[Install]
+WantedBy=multi-user.target
+

@@ -1,0 +1,3 @@
+#!/bin/bash
+
+sudo mount -t exfat /dev/sda1  /exdrive/ -o peter -o peter

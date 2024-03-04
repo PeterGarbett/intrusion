@@ -1,0 +1,837 @@
+#!/usr/bin/python3
+#
+# 	Intrusion detection
+#
+#
+#   Motion detector followed by using yolo to see if
+#   given catagories are involved then saving of images
+#   via scp - potentialy anywhere. Motion detection by itself
+#   is prone to many false alarms when looking for people 
+#   with changing light and wind moving trees etc
+#
+#   Multiple tasks used, 3 main in image pipeline
+#   This enables access to multiple cores.
+#
+# 		 q          ib
+# 	generate -> analyse -> preserve
+#
+# 	Generate
+# 	produces images from camera and does basic motion detection
+# 	then passes  images with motion detected into queue "q"
+#
+# 	analyse
+# 	Subjects image to yolo (You Only look Once) to see
+# 	if it contains objects of interest (as defined in configuration file
+#
+# 	preserve
+# 	saves file to filesystem and attempts transfer via scp
+# 	manages space if we are running out by deleting oldest files
+# 	renames file to local_ if transfer suceeeds. It should be possible
+#   to daisy chain several devices together.
+#
+# 	reTransmit
+# 	Try to send file again and rename with prefix 'local_' on success.
+#
+# 	Last two processes share access using a filesystem lock
+#
+# 	main code gets configuration values, defines queues, sets
+# 	off processes then checks they are alive at intervals.
+# 	Restart in case of error. The service file should restart
+# 	the program.
+#
+# 	queue exhaustion is avoided by rate limitimg image generation.
+# 	There should be a large swapspace set up which will result in
+# 	slowdown but not error if this calculation is transiently incorrect.
+#
+# 	Multiple values can be changed via a configuration file.
+# 	The main process calls these and then sets off the processes
+# 	Some of these parameters therefore have to be global but the
+# 	ammount they are shared is actually minimal
+
+
+import numpy as np
+import cv2 as cv
+from multiprocessing import Process, Queue
+import queue
+from time import sleep
+
+node = 1
+version = 1.0
+sshKeyLoc = ""  # should be .ssh and read from intrusion.conf
+
+high_def = None
+
+# Local filestore
+
+jpeg_store = ""
+
+SuppressDeletion = False  # True     # Dry run for test purposes
+LocalSizeLimit = 1 * 2 ** 30  # bytes required free
+NumberPics = False  # Good for debugging, as an alternative to timestamps
+
+# Remote filestore
+
+user = ""
+hostname = ""
+path = ""
+
+Trigger = 1.8  # Roughly, the percentage change that triggers a snapshot
+sleepDelay = 1.0  # Time to look away after a motion detect to avoid overloads
+frameLimit = 10
+window = 1  # If the generator produces more data within this window, the following process will not sleep
+window2 = 1  # If the analysis process produces more data within this window, the following process will not sleep
+
+import copySSHKeys
+
+#
+# 	Load a few variables from our configuration file
+#
+#
+#
+
+
+def configure():
+
+    global user
+    global hostname
+    global path
+    global jpeg_store
+    global Trigger
+    global sleepDelay
+    global numberPics
+    global high_def
+    global newKeyDir
+    global sshKeyLoc
+    global lifeforms
+
+    debug = False
+
+    #   Search directories for intrusion.conf
+
+    config_filename = "intrusion.conf"
+    config_location = "/exdrive/Snapshots/"
+    config_location2 = "/etc/intrusion/"
+
+    #   It is important to select no change of case here since some data are file locations
+
+    config_found = ""
+    trial_location = config_location + config_filename
+    trial_location2 = config_location2 + config_filename
+
+    exl = readfile_ignore_comments.readfile_ignore_comments(trial_location, 0)
+    if [] != exl:
+        config_found = trial_location
+    else:
+        exl = readfile_ignore_comments.readfile_ignore_comments(trial_location2, 0)
+        if [] != exl:
+            config_found = trial_location2
+
+    if config_found == "":
+        print(
+            "No configuration file found,need", trial_location, " or ", trial_location2
+        )
+        exit()
+    else:
+        print("Using configuration file ", config_found)
+
+    user = user + load_param(exl, "remote_user:")
+    hostname = hostname + load_param(exl, "remote_url:")
+    path = path + load_param(exl, "remote_path:")
+
+    hd = load_param(exl, "high_def:")
+    if hd == "true":
+        high_def = True
+    else:
+        high_def = False
+        if hd != "false":
+            print("Bad selection value for high definition: assummed false")
+
+    jpeg_store = load_param(exl, "local_filestore:")
+
+    useTS = load_param(exl, "use_timestamps:")
+    if useTS == "true":
+        numberPics = False
+    else:
+        if useTS == "false":
+            numberPics = True
+        else:
+            print("Illegal timestamp selection - defaulting to timestamping")
+            numberPics = False
+
+    triggerStr = load_param(exl, "motion_trigger_level:")
+
+    try:
+        Trigger = float(triggerStr)
+    except:
+        print("Illegal value for trigger", triggerStr)
+        exit()
+
+    sleepDelayTxt = load_param(exl, "triggerdelay:")
+
+    try:
+        sleepDelay = float(sleepDelayTxt)
+    except:
+        print("Illegal value for trigger delay,defaulting to 1.0:", sleepDelayTxt)
+        sleepDelay = 1.0
+
+    # Look for new .ssh directory content
+
+    sshKeyLoc = load_param(exl, "ssh_directory:")
+    if sshKeyLoc != "":
+        newKeyDir = load_param(exl, "new_ssh_elements:")
+        if newKeyDir != None:
+            copySSHKeys.update_keys(newKeyDir, sshKeyLoc)
+
+    #
+    #   Not a lot of error checking for this one...
+    #
+    #
+    lifeformsText = load_param(exl, "lookfor:")
+    lifeformsTa = lifeformsText.replace("]", "")
+    lifeformsTb = lifeformsTa.replace("[", "")
+    lifeformsc = lifeformsTb.replace("'", "")
+    lifeforms = set(lifeformsc.split(","))
+
+    debug = False
+
+    if debug:
+        print("Configuration values as read :")
+        print("Trigger:", Trigger)
+        print("TriggerDelayTime(secs):", sleepDelay)
+        print("LookFor:", lifeforms)
+        print("Remote hostname", hostname)
+        print("Remote user:", user)
+        print("Remote path", path)
+        print("HD selected:", high_def)
+        print("Local image storage:", jpeg_store)
+        print("Use timestamps:", not numberPics)
+        print(".ssh directory :", sshKeyLoc)
+        print("New .ssh directory contents:", newKeyDir)
+
+
+#   Simple, lightweight
+#   difference consequtive images and sum the pixel values
+#   see if this exceeds a threshold
+
+
+def generate(q):
+    global cap  #   so we can close down
+
+    # Some configuration values
+
+    debug = False
+
+    if high_def:
+        width = 1920
+        height = 1080
+    else:
+        width = 640
+        height = 480
+
+    print("Configuration values :")
+    print("Node ", node, "software version", version)
+    print("Trigger:", Trigger)
+    print("TriggerDelayTime(secs):", sleepDelay)
+    print("LookFor:", lifeforms)
+    print("Remote hostname", hostname)
+    print("Remote user:", user)
+    print("Remote path", path)
+    print("HD selected:", high_def)
+    print("Local image storage:", jpeg_store)
+    print("Use timestamps:", not numberPics)
+    print("New .ssh directory contents:", newKeyDir)
+    print(".ssh directory :", sshKeyLoc)
+
+    #
+    #   Difference between consequtive images is noisy especially in low light
+    #   Consider a Low pass filter
+    #
+    avDiff = 0
+    avDiffAlpha = 0.0  # Near 0 means ndiff dominates
+    avDiffBeta = 1 - avDiffAlpha
+
+    #   Something like 10 percent of all the pixels whose
+    #   values are 0 to 256.  A guess validated by experiment
+
+    PixelDiffThreshold = 128 * width * height * Trigger / 100
+
+    #   Setup video capture
+    #   the 0 lets opencv figure it out which it does nicely when there
+    #   is only one camera
+
+    cap = cv.VideoCapture(0)
+    if not cap.isOpened():
+        print("Cannot open camera")
+        exit()
+
+    cap.set(3, width)
+    cap.set(4, height)
+    cap.set(6, cv.VideoWriter.fourcc("M", "J", "P", "G"))
+
+    #   Setup first pass flag
+
+    First = True
+    frameCount = 0
+
+    # video frame capture loop
+
+    while True:
+        ret, frame = cap.read()
+
+        # if frame is read correctly ret is True
+        if not ret:
+            print("Can't receive frame (stream end?). Exiting ...")
+            cap.release()
+            exit()
+            break
+
+        frameCount += 1
+        gray = cv.cvtColor(frame, cv.COLOR_BGR2GRAY)
+
+        #   First time through there isn't an earlier image
+        #   so force comparison with itself.
+
+        if First:
+            oldgray = gray
+            First = False
+        #       Difference this image with the last one
+
+        difference = cv.absdiff(gray, oldgray)
+        num_diff = np.sum(difference)  # Calculate how far from a zero image we are
+
+        #   The value of num_diff varies noisily especially at low light levels so
+        #   keep a more stable running average
+
+        if First:
+            avDiff = num_diff
+        else:
+            avDiff = avDiff * avDiffAlpha + num_diff * avDiffBeta
+
+        if debug:
+            print(
+                PixelDiffThreshold,
+                " bright:",
+                num_diff,
+                "brightness averaged:",
+                avDiff,
+                lavDiff,
+                abs(avDiff),
+            )
+
+        #       Possible use of low pass
+        #        if PixelDiffThreshold < abs(avDiff):
+        if PixelDiffThreshold < abs(num_diff):
+            q.put(frame)
+            if debug:
+                print("Motion detected pushed frame", frameCount)
+            sleep(sleepDelay)
+            First = True  # Avoid recording the next image
+            if frameLimit < q.qsize():
+                sleep(0.5)  # Prevent system overload
+
+        sleep(0.25)
+        oldgray = gray
+
+    # When everything done, release the capture
+
+    cap.release()
+    cv.destroyAllWindows()
+
+    exit(0)
+
+
+# Define a function that will run in a separate process
+
+import yolo
+import sys
+
+#
+# Some of these are rather unlikely
+# given where we live
+#
+# possible lifeforms yolo will detect are:
+#    {"person","bear","bird","cat", "cow","dog","elephant","giraffe", "horse", "sheep","zebra",}
+#
+# You can also put car or truck in here...
+#
+# Detect whats in the image using yolo
+#
+
+
+def lifeforms_scan(frame):
+    debug = False
+
+    # Need an entry point that takes an image
+    # Could scan for lots of things..
+    # Full list in yolov3.txt
+    # What we actually scan for is defined in the config file
+
+    found = set(yolo.yoloImage(frame))
+    found_lifeforms = found & lifeforms
+
+    if debug:
+        print("found:", found)
+        print("lifeforms found:", found_lifeforms)
+
+    if len(found_lifeforms) == 0:
+        return False
+    else:
+        return True
+
+
+# get image from queue 'q'
+# Analyse image using yolo
+# If its interesting put it on queue 'ib'
+
+
+def analyse(q, ib):
+
+    debug = False
+
+    while True:
+        try:
+            item = q.get_nowait()
+        except queue.Empty:
+            sleep(window)
+            continue
+
+        if debug:
+            print("analyse image")
+        cols = cv.cvtColor(item, cv.COLOR_BGR2RGB)
+
+        if lifeforms_scan(cols):
+            ib.put(cols)
+            if debug:
+                print("Lifeforms exist!")
+        else:
+            if debug:
+                print("No lifeforms!!")
+
+
+# Send image to somewhere non-local using scp
+# This could be anywhere on the internet
+
+
+from PIL import Image as im
+import paramiko
+from paramiko import SSHClient
+from scp import SCPClient
+
+
+def send_file(filename):
+    debug = False
+
+    sent = True
+
+    try:
+        client = paramiko.SSHClient()
+        client.load_system_host_keys()
+        client.connect(hostname, username=user)
+        with SCPClient(client.get_transport()) as scp:
+            scp.put(filename, remote_path=path)
+    except Exception as e:
+        if debug:
+            print("Failed to save file to remote", e)
+        sent = False
+        pass
+
+    return sent
+
+
+import datetime
+
+# produce time stamp string for use in file naming
+
+
+def timestampedFilename():
+    presentday = datetime.datetime.now()
+
+    name = str(presentday)
+
+    name = name.replace(".", "")
+    name = name.replace("-", "")
+    name = name.replace(" ", "")
+    name = name.replace(":", "")
+    filename = name
+
+    return filename
+
+
+# See if we are running out of local storage
+# and delete a few oldest files if so
+# This is to avoid a problem on unattended infrequently managed systems
+
+import os
+import shutil
+
+
+def RunningLow(folder, limit):
+    debug = False
+
+    total, used, free = shutil.disk_usage(folder)
+
+    if debug:
+        print("Free: %d GiB" % (free // (2 ** 30)))
+
+    if free < limit:
+        return True
+    else:
+        return False
+
+
+def delete_oldest(folder):
+
+    debug = False
+
+    # folder is the name of the folder in which we
+    # have to perform the delete operation
+    # changing the current working directory
+    # to the folder specified
+
+    os.chdir(os.path.join(os.getcwd(), folder))
+
+    list_of_files = os.listdir(".")
+    if len(list_of_files) == 0:
+        return
+
+    oldest_file = min(list_of_files, key=os.path.getctime)
+
+    if debug:
+        print("Oldest data file", folder + oldest_file, " to be deleted")
+
+    if not SuppressDeletion:
+        os.remove(os.path.abspath(folder + oldest_file))
+
+
+def make_space(folder, limit):
+    space_low = RunningLow(folder, limit)
+    if space_low:  # delete a few, releasing lock in between
+        delete_oldest(folder)
+        delete_oldest(folder)
+        delete_oldest(folder)
+
+
+# Routine to define the filenames we use.
+# Numbering the pictures is useful for debugging
+# but overwrites on every restart
+
+
+def imageName(numberPics, dirname, node, count, timestamp, local):
+    if local:
+        here = "local_"
+    else:
+        here = ""
+
+    if numberPics:
+        outname = dirname + here + "m" + str(node) + "_" + str(count) + ".jpg"
+    else:
+        outname = dirname + here + "m" + str(node) + "_" + timestamp + ".jpg"
+
+    return outname
+
+
+# Stage 3 of our image pipeline. We have something worth saving
+# so set about keeping it.
+
+
+def preserve(ib, lock):
+    debug = False
+
+    frameCount = 0
+
+    while True:
+        try:
+            frame = ib.get_nowait()
+        except queue.Empty:
+            sleep(window2)
+            continue
+
+        image = im.fromarray(frame)
+
+        timestamp = timestampedFilename()
+
+        outname = imageName(NumberPics, jpeg_store, node, frameCount, timestamp, False)
+
+        if debug:
+            print("Save image", outname)
+
+        #   Save file locally
+
+        acq = lock.acquire(block=True)
+
+        image.save(outname)
+
+        #   Try to send over the internet
+
+        scp_status = send_file(outname)
+
+        #   If we succeed then rename the file as local... implying it also exists remotely
+
+        if scp_status:
+            newname = imageName(
+                NumberPics, jpeg_store, node, frameCount, timestamp, True
+            )
+            os.rename(outname, newname)
+            if debug:
+                print("File renamed from", outname, " to ", newname)
+        else:
+            if debug:
+                print("file failed to copy to remote")
+
+        #   This means we can easily identify what hasn't been sent ...  to retry later
+
+        frameCount += 1
+
+        lock.release()
+
+
+# helper function for reTransmit, since the filename
+# determines the action we need to take, and we also may
+# need to change it.
+
+
+def parseFilename(numberPics, name):
+    #    print("parse filename",name)
+
+    filename, file_ext = os.path.splitext(name)
+
+    base, fname = os.path.split(filename)
+    base = base + "/"
+    nameList = fname.split("_")
+    Mandnode = nameList[0]
+
+    if len(Mandnode) == 0:
+        return ""
+
+    if Mandnode[0] != "m":
+        return ""
+
+    nodestr = Mandnode[1:]
+
+    if not nodestr.isnumeric():
+        return ""
+
+    node = int(nodestr)
+    stamp = nameList[1]
+
+    if not stamp.isnumeric():
+        return ""
+
+    newname = imageName(numberPics, base, node, stamp, stamp, True)
+
+    return newname
+
+
+# reTransmit - which is in fact a misnomer it's more like retry
+# transferring something that didn't go the first time.
+# This is intended to be a background task and would come into play
+# if the connection to the remote machine went down transiently
+# I assumme here we aren't sending data out to a machine on the LAN
+# the main case of interest is lost inetrnet, so we test for it
+# now working 1st
+
+
+import glob
+import os
+
+
+def reTransmit(lock):
+    debug = False
+
+    while True:
+        sleep(160)
+
+        hostname = "google.com"  # example
+        response = os.system("ping -c 1 -w2 " + hostname + " > /dev/null 2>&1")
+
+        if response != 0:
+            if debug:
+                print("No internet connection")
+            continue
+
+        acq = lock.acquire(block=False)
+        if not acq:
+            continue
+
+        make_space(
+            jpeg_store, LocalSizeLimit
+        )  # Check filesystem size and delete if necessary
+
+        # get files not starting local
+
+        imgnames = sorted(glob.glob(jpeg_store + "m*.jpg"))
+
+        if len(imgnames) == 0:
+            lock.release()
+            continue
+
+        outname = imgnames[0]
+
+        if debug:
+            print("reTransmit:", outname)
+
+        scp_status = send_file(outname)
+
+        #   If we succeed then rename the file as local... implying it also exists remotely
+
+        if scp_status:
+            newname = parseFilename(NumberPics, outname)
+
+            if newname != "":
+                os.rename(outname, newname)
+                if debug:
+                    print("File renamed from", outname, " to ", newname)
+
+        lock.release()
+
+
+#
+#   And now the multitasking bit....
+#
+
+import signal, os
+from multiprocessing import Pool
+from multiprocessing import active_children
+
+# Attempt orderly shutdown
+
+
+def handler(signum, frame):
+    signame = signal.Signals(signum).name
+    print("Caught signal", signame)
+
+    for p in multiprocessing.active_children():
+        p.terminate()
+
+    exit()
+
+
+import multiprocessing
+
+fileLock = multiprocessing.Lock()
+
+
+import readfile_ignore_comments
+
+# 	Routines used to parse configuration file
+
+
+def find_element_substring(items, subst):
+    for i in range(len(items)):
+        if subst in items[i]:
+            return i
+    return -1
+
+
+def load_param(exl, parameter):
+    index = find_element_substring(exl, parameter)
+    if index == -1:
+        print(parameter, "not defined in config file")
+    else:
+        filestr = exl[index]
+        filestr = filestr.split(":")
+        data = filestr[1]
+
+        return data
+
+
+def main():
+    global cap
+
+    configure()
+
+    #   Configuration complete. Now start
+
+    debug = False
+
+    parent = multiprocessing.parent_process()
+    parentPID = 0  # parent.pid
+
+    expectedChildren = 4
+
+    # The following code sets up the queues and processes and starts them
+    #
+    # we have three processes connectd by two queues namely
+    # generate->q->analyse->ib->preserve  and a reTransmit background task
+    # which  shares a filesystem lock with preserve
+
+    # Create an instance of the Queue class
+
+    q = Queue()
+    ib = Queue()
+
+    # Create instances of the Process class, one for each function
+
+    p1 = Process(target=generate, args=(q,))
+
+    p2 = Process(
+        target=analyse,
+        args=(
+            q,
+            ib,
+        ),
+    )
+
+    p3 = Process(
+        target=preserve,
+        args=(
+            ib,
+            fileLock,
+        ),
+    )
+
+    p4 = Process(target=reTransmit, args=(fileLock,))
+
+    # Start processes
+    p1.start()
+    p2.start()
+    p3.start()
+    p4.start()
+
+    signal.signal(signal.SIGTERM, handler)
+
+    #   Watchdog
+
+    P1PID = p1.pid
+    P2PID = p2.pid
+    P3PID = p3.pid
+    P4PID = p4.pid
+
+    #        print(parentPID,P1PID,P2PID,P3PID,P4PID)
+
+    while True:
+
+        # Check children are all (nominally) active
+
+        childCount = 0
+        for p in multiprocessing.active_children():
+            childCount += 1
+        if debug:
+            print("Active children", childCount)
+        if childCount < expectedChildren:
+            print("A Child has gone missing")
+            cap.close()
+            for p in multiprocessing.active_children():
+                print("Active child:", p)
+                p.terminate()
+            exit()
+
+        # I will probably need to produce a pulse for each process
+        # t.b.d
+        # print("queue sizes:",ib.qsize(),q.qsize())
+
+        sleep(10)
+
+    #   These processes never terminate under normal operation so join is a backstop
+    #   where this process will wait forever
+
+    # Wait for processes to finish
+
+    p1.join()
+    p2.join()
+    p3.join()
+    p4.join()
+
+
+if __name__ == "__main__":
+    main()
