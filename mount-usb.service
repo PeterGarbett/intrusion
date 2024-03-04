@@ -1,0 +1,13 @@
+#
+#	This file needs to be on /etc/systemd/system/
+#
+[Unit]
+Description=mount-usb stick
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/mount-usb
+
+[Install]
+WantedBy=multi-user.target
+
