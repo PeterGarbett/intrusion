@@ -6,7 +6,7 @@
 #
 # Hacked to return a list of types of objects found
 # and entry points added to operate directly on a image
-# or on a file containing an image.  Direct command line 
+# or on a file containing an image.  Direct command line
 # usage removed and yolo file locations fixed
 # at /etc/opt/yolo/
 #
@@ -18,10 +18,9 @@ import numpy as np
 
 def start(imageFileName, directImage, useDirect):
 
-
-# This emulates what the software would expect for the command line.
-# I've chosen /etc/opt/yolo as a home for the data files. This file
-# on /usr/local/bin so I can call it froum anywhere
+    # This emulates what the software would expect for the command line.
+    # I've chosen /etc/opt/yolo as a home for the data files. This file
+    # on /usr/local/bin so I can call it froum anywhere
 
     args = argparse.Namespace(
         image=imageFileName,

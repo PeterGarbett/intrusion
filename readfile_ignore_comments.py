@@ -6,7 +6,7 @@
 
 def stripString(commented_line, changeCase):
 
-#   Parse option to change case
+    #   Parse option to change case
 
     if changeCase == -1:
         commented_line = commented_line.lower()
@@ -14,16 +14,18 @@ def stripString(commented_line, changeCase):
         if changeCase == 1:
             commented_line = commented_line.upper()
 
-# Only interested in the first item delimited by a #
+    # Only interested in the first item delimited by a #
 
     cleaved = commented_line.split("#")
     commented_line = cleaved[0].strip()
 
     return commented_line
 
+
 #
 #   If we can't find the file, return a [] and don't generate an exception
 #
+
 
 def readfile_ignore_comments(diskname, changeCase):
 
@@ -47,7 +49,7 @@ def readfile_ignore_comments(diskname, changeCase):
 
             return exclude
 
-    except FileNotFoundError :
+    except FileNotFoundError:
         return []
 
     except Exception as err:

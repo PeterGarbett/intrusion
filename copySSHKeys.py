@@ -9,6 +9,7 @@
 import os
 import shutil
 
+
 def update_keys(keyFileLoc, sshKeys):
 
     #   look in directory holding new keys
@@ -50,7 +51,7 @@ def update_keys(keyFileLoc, sshKeys):
 
     copyList = [x for x in list_of_files if x not in list_of_filesDest]
 
-    if len(copyList) == 0:	#	Nothing to copy so finished
+    if len(copyList) == 0:  # 	Nothing to copy so finished
         return
     else:
         for source in copyList:
