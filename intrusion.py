@@ -209,6 +209,15 @@ def configure():
     lifeformsc = lifeformsTb.replace("'", "")
     lifeforms = set(lifeformsc.split(","))
 
+    #   Check filestore location exists
+
+    try:
+         os.listdir(jpeg_store)
+    except:
+        print("Directory",jpeg_store,"not found")
+        exit()
+
+
     debug = False
 
     if debug:
@@ -233,7 +242,6 @@ def configure():
 
 def generate(q):
 
-    global cap  #   so we can close down
 
     # Some configuration values
 
@@ -455,22 +463,6 @@ def send_file(filename):
 
 import datetime
 
-# produce time stamp string for use in file naming
-
-
-def timestampedFilename():
-    presentday = datetime.datetime.now()
-
-    name = str(presentday)
-
-    name = name.replace(".", "")
-    name = name.replace("-", "")
-    name = name.replace(" ", "")
-    name = name.replace(":", "")
-    filename = name
-
-    return filename
-
 
 # See if we are running out of local storage
 # and delete a few oldest files if so
@@ -483,7 +475,11 @@ import shutil
 def RunningLow(folder, limit):
     debug = False
 
-    total, used, free = shutil.disk_usage(folder)
+
+    try:
+        total, used, free = shutil.disk_usage(folder)
+    except:
+        return False
 
     if debug:
         print("Free: %d GiB" % (free // (2 ** 30)))
@@ -525,29 +521,10 @@ def make_space(folder, limit):
         delete_oldest(folder)
         delete_oldest(folder)
 
-
-# Routine to define the filenames we use.
-# Numbering the pictures is useful for debugging
-# but overwrites on every restart
-
-
-def imageName(numberPics, dirname, node, count, timestamp, local):
-    if local:
-        here = "local_"
-    else:
-        here = ""
-
-    if numberPics:
-        outname = dirname + here + "m" + str(node) + "_" + str(count) + ".jpg"
-    else:
-        outname = dirname + here + "m" + str(node) + "_" + timestamp + ".jpg"
-
-    return outname
-
-
 # Stage 3 of our image pipeline. We have something worth saving
 # so set about keeping it.
 
+import filenames 
 
 def preserve(ib, lock):
     debug = False
@@ -566,9 +543,9 @@ def preserve(ib, lock):
 
         image = im.fromarray(frame)
 
-        timestamp = timestampedFilename()
+        timestamp = filenames.timestampedFilename()
 
-        outname = imageName(NumberPics, jpeg_store, node, frameCount, timestamp, False)
+        outname = filenames.imageName(NumberPics, jpeg_store, node, frameCount, timestamp, False)
 
         if debug:
             print("Save image", outname)
@@ -584,9 +561,10 @@ def preserve(ib, lock):
         scp_status = send_file(outname)
 
         #   If we succeed then rename the file as local... implying it also exists remotely
+        #   This means we can easily identify what hasn't been sent ...  to retry later
 
         if scp_status:
-            newname = imageName(
+            newname = filenames.imageName(
                 NumberPics, jpeg_store, node, frameCount, timestamp, True
             )
             os.rename(outname, newname)
@@ -596,48 +574,15 @@ def preserve(ib, lock):
             if debug:
                 print("file failed to copy to remote")
 
-        #   This means we can easily identify what hasn't been sent ...  to retry later
-
         frameCount += 1
+        frameCount = (
+            frameCount % 1024
+        )  # Make these wrap around so they don't used unbounded levels of storage
 
         lock.release()
 
 
-# helper function for reTransmit, since the filename
-# determines the action we need to take, and we also may
-# need to change it.
 
-
-def parseFilename(numberPics, name):
-    #    print("parse filename",name)
-
-    filename, file_ext = os.path.splitext(name)
-
-    base, fname = os.path.split(filename)
-    base = base + "/"
-    nameList = fname.split("_")
-    Mandnode = nameList[0]
-
-    if len(Mandnode) == 0:
-        return ""
-
-    if Mandnode[0] != "m":
-        return ""
-
-    nodestr = Mandnode[1:]
-
-    if not nodestr.isnumeric():
-        return ""
-
-    node = int(nodestr)
-    stamp = nameList[1]
-
-    if not stamp.isnumeric():
-        return ""
-
-    newname = imageName(numberPics, base, node, stamp, stamp, True)
-
-    return newname
 
 
 # reTransmit - which is in fact a misnomer it's more like retry
@@ -655,7 +600,7 @@ import os
 
 def reTransmit(lock):
 
-    debug = True
+    debug = False
 
     while True:
         retransmissionActive.value += 1  # Watchdog
@@ -695,7 +640,7 @@ def reTransmit(lock):
         #   If we succeed then rename the file as local... implying it also exists remotely
 
         if scp_status:
-            newname = parseFilename(NumberPics, outname)
+            newname = filenames.parseFilename(NumberPics, outname)
 
             if newname != "":
                 os.rename(outname, newname)
