@@ -6,7 +6,7 @@
 #   Motion detector followed by using yolo to see if
 #   given catagories are involved then saving of images
 #   via scp - potentialy anywhere. Motion detection by itself
-#   is prone to many false alarms when looking for people 
+#   is prone to many false alarms when looking for people
 #   with changing light and wind moving trees etc
 #
 #   Multiple tasks used, 3 main in image pipeline
@@ -51,7 +51,8 @@
 
 import numpy as np
 import cv2 as cv
-from multiprocessing import Process, Queue
+import multiprocessing
+from multiprocessing import Process, Queue, Value
 import queue
 from time import sleep
 
@@ -78,8 +79,21 @@ path = ""
 Trigger = 1.8  # Roughly, the percentage change that triggers a snapshot
 sleepDelay = 1.0  # Time to look away after a motion detect to avoid overloads
 frameLimit = 10
-window = 1  # If the generator produces more data within this window, the following process will not sleep
-window2 = 1  # If the analysis process produces more data within this window, the following process will not sleep
+
+# Subprocess rate limiting
+
+window = 0.25  # analysis polling rate limiter
+window2 = 0.1  # filestore management polling rate limiter
+window3 = 60  # reTransmit polling rate
+
+#
+#   Watchdog variables for sub-processes
+#
+
+framesBeingProcessed = multiprocessing.Value("i", 0)
+yoloAnalysisActive = multiprocessing.Value("i", 0)
+filestoreActive = multiprocessing.Value("i", 0)
+retransmissionActive = multiprocessing.Value("i", 0)
 
 import copySSHKeys
 
@@ -88,9 +102,12 @@ import copySSHKeys
 #
 #
 #
+#
 
 
 def configure():
+
+    # These variables are in the same global scope as main so multiprocessing aspects don't arise
 
     global user
     global hostname
@@ -215,6 +232,7 @@ def configure():
 
 
 def generate(q):
+
     global cap  #   so we can close down
 
     # Some configuration values
@@ -286,6 +304,11 @@ def generate(q):
             break
 
         frameCount += 1
+        framesBeingProcessed.value += 1  # Update watchdog
+
+        if debug:
+            print("framesBeingProcessed set:", framesBeingProcessed.value)
+
         gray = cv.cvtColor(frame, cv.COLOR_BGR2GRAY)
 
         #   First time through there isn't an earlier image
@@ -294,40 +317,29 @@ def generate(q):
         if First:
             oldgray = gray
             First = False
-        #       Difference this image with the last one
+            num_diff = 0
+            avDiff = 0
+        else:
+            #       Difference this image with the last one
 
-        difference = cv.absdiff(gray, oldgray)
-        num_diff = np.sum(difference)  # Calculate how far from a zero image we are
+            difference = cv.absdiff(gray, oldgray)
+            num_diff = np.sum(difference)  # Calculate how far from a zero image we are
 
         #   The value of num_diff varies noisily especially at low light levels so
-        #   keep a more stable running average
-
-        if First:
-            avDiff = num_diff
-        else:
-            avDiff = avDiff * avDiffAlpha + num_diff * avDiffBeta
+        #   consider keeping a more stable running average
+        # avDiff = avDiff * avDiffAlpha + num_diff * avDiffBeta
 
         if debug:
-            print(
-                PixelDiffThreshold,
-                " bright:",
-                num_diff,
-                "brightness averaged:",
-                avDiff,
-                lavDiff,
-                abs(avDiff),
-            )
+            print(PixelDiffThreshold, num_diff)
 
-        #       Possible use of low pass
-        #        if PixelDiffThreshold < abs(avDiff):
         if PixelDiffThreshold < abs(num_diff):
             q.put(frame)
             if debug:
-                print("Motion detected pushed frame", frameCount)
+                print("Motion detected, pushed frame", frameCount)
             sleep(sleepDelay)
-            First = True  # Avoid recording the next image
             if frameLimit < q.qsize():
                 sleep(0.5)  # Prevent system overload
+                First = True  # Re-initialise after delay
 
         sleep(0.25)
         oldgray = gray
@@ -389,6 +401,9 @@ def analyse(q, ib):
     debug = False
 
     while True:
+
+        yoloAnalysisActive.value += 1
+
         try:
             item = q.get_nowait()
         except queue.Empty:
@@ -540,6 +555,9 @@ def preserve(ib, lock):
     frameCount = 0
 
     while True:
+
+        filestoreActive.value += 1
+
         try:
             frame = ib.get_nowait()
         except queue.Empty:
@@ -636,10 +654,12 @@ import os
 
 
 def reTransmit(lock):
-    debug = False
+
+    debug = True
 
     while True:
-        sleep(160)
+        retransmissionActive.value += 1  # Watchdog
+        sleep(window3)  # Whose update rate is low: beware
 
         hostname = "google.com"  # example
         response = os.system("ping -c 1 -w2 " + hostname + " > /dev/null 2>&1")
@@ -810,20 +830,45 @@ def main():
             print("Active children", childCount)
         if childCount < expectedChildren:
             print("A Child has gone missing")
-            cap.close()
             for p in multiprocessing.active_children():
                 print("Active child:", p)
                 p.terminate()
             exit()
 
-        # I will probably need to produce a pulse for each process
-        # t.b.d
-        # print("queue sizes:",ib.qsize(),q.qsize())
+        # Inspect a pulse for each process
 
-        sleep(10)
+        framesBeingProcessed.value = 0
+        yoloAnalysisActive.value = 0
+        filestoreActive.value = 0
+        retransmissionActive.value = 0  # Check this at a slower rate
 
-    #   These processes never terminate under normal operation so join is a backstop
-    #   where this process will wait forever
+        #       In fact check everything at quite a slow rate
+
+        sleep(10 * window3 + 1)  # Wait for processes to increment it, if active
+
+        if debug:
+            print("loop count for generate:", framesBeingProcessed.value)
+            print("loop count for yolo analysis:", yoloAnalysisActive.value)
+            print("loop count for filestore handling:", filestoreActive.value)
+            print(
+                "loop count for reTramission activity:", retransmissionActive.value
+            )  # Check this at a slower rate
+
+        if (
+            framesBeingProcessed.value == 0
+            or yoloAnalysisActive.value == 0
+            or filestoreActive.value == 0
+        ):
+            print("processing has stopped, exiting anticipating a restart")
+            print("loop count for frame generate:", framesBeingProcessed.value)
+            print("loop count for yolo analysis:", yoloAnalysisActive.value)
+            print("loop count for filestore handling:", filestoreActive.value)
+            print("loop count for reTramission activity:", retransmissionActive.value)
+
+            for p in multiprocessing.active_children():
+                p.terminate()
+
+    #   These processes never terminate under normal operation
 
     # Wait for processes to finish
 
