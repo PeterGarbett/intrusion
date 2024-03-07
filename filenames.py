@@ -71,12 +71,12 @@ def imageName(numberPics, dirname, node, count, timestamp, local):
 import os
 
 
-def parseFilename(numberPics, name):
+def parseFilename(numberPics, name,returnIdent):
 
     debug = False
 
     if debug:
-        print("Parsei filename:", name)
+        print("Parse filename:", name)
 
     filename, file_ext = os.path.splitext(name)
 
@@ -135,30 +135,85 @@ def parseFilename(numberPics, name):
     if not picIdent.replace("_", "").isnumeric():
         return ""
 
+    if returnIdent:
+        return picIdent
+
     newname = imageName(numberPics, base, node, picIdent, picIdent, True)
 
     return newname
+
+import datetime
+
+def txtTimestampToTime(timestamp):
+    
+
+    # Convert someting of the form
+    # 2024_03_06_14_24_21_423461
+    # to datetime object
+
+    timestamp=timestamp.replace("_","-",2)
+    timestamp=timestamp.replace("_"," ",1)
+    timestamp=timestamp.replace("_",":",2)
+    timestamp=timestamp.replace("_",".",1)
+
+    # the fact that strptime isn't capable of coping
+    # directly with the output of datetime now is
+    # really poor. 
+
+    try:
+        stampNoMs = timestamp[:-7]
+        MicrosecondsTXT = timestamp.split(".")[1]
+        Microseconds = int(MicrosecondsTXT)
+        when = datetime.datetime.strptime(stampNoMs,"%Y-%m-%d %H:%M:%S")
+        when = when.replace(microsecond=Microseconds)
+    except Exception  as e:
+        when =0
+        print("Incorrect date format",e)
+
+    return when
+
 
 
 def main():
 
     filename = "/home/peter/2024_03_06_14_24_21_423461_lb42.jpg"
     print("Old name:", filename)
-    new = parseFilename(False, filename)
+    new = parseFilename(False, filename,False)
     print("newname:", new)
     filename = "/home/peter/123456789_lb21.jpg"
     print("Old name:", filename)
-    new = parseFilename(True, filename)
+    new = parseFilename(False, filename,False)
     print("newname:", new)
 
     filename = "/home/peter/2024_03_06_14_24_21_423461_local_lb42.jpg"
     print("Old name:", filename)
-    new = parseFilename(False, filename)
+    new = parseFilename(True, filename,False)
     print("newname:", new)
     filename = "/home/peter/123456789_local_lb21.jpg"
     print("Old name:", filename)
-    new = parseFilename(True, filename)
+    new = parseFilename(True, filename,False)
     print("newname:", new)
+
+    filename = "/home/peter/123456789_local_lb21.jpg"
+    new = parseFilename(True, filename,True)
+    print("file ident :", new)
+
+    filename = "/home/peter/2024_03_06_14_24_21_423461_local_lb42.jpg"
+    timestamp= parseFilename(False, filename,True)
+    print("file ident :", new)
+
+    presentday = datetime.datetime.now()
+    print(presentday)
+
+    when = txtTimestampToTime(timestamp)
+
+    print(when)
+    print(type(when))
+
+    print(timestamp)
+
+
+
 
 
 if __name__ == "__main__":
