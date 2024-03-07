@@ -212,11 +212,10 @@ def configure():
     #   Check filestore location exists
 
     try:
-         os.listdir(jpeg_store)
+        os.listdir(jpeg_store)
     except:
-        print("Directory",jpeg_store,"not found")
+        print("Directory", jpeg_store, "not found")
         exit()
-
 
     debug = False
 
@@ -240,12 +239,21 @@ def configure():
 #   see if this exceeds a threshold
 
 
-def generate(q):
+def directly_save_image(webcamFile,frame,lock):
+    image = im.fromarray(frame)
+    acq = lock.acquire(block=False)
+    if acq:
+        image.save(webcamFile)
+        lock.release()
 
+
+def generate(q, lock):
 
     # Some configuration values
 
     debug = False
+
+    webcamFile = jpeg_store + "live.jpg"
 
     if high_def:
         width = 1920
@@ -267,6 +275,11 @@ def generate(q):
     print("Use timestamps:", not numberPics)
     print("New .ssh directory contents:", newKeyDir)
     print(".ssh directory :", sshKeyLoc)
+
+    # "sort of" live output`
+
+
+    print("Live(ish) output on :", webcamFile)
 
     #
     #   Difference between consequtive images is noisy especially in low light
@@ -302,55 +315,59 @@ def generate(q):
     # video frame capture loop
 
     while True:
-        ret, frame = cap.read()
+
+        # Read two images with a gap between to improve reliability of
+        # motion detection. Should really be some sort of critical section
+
+        ret, frame1 = cap.read()
 
         # if frame is read correctly ret is True
         if not ret:
             print("Can't receive frame (stream end?). Exiting ...")
             cap.release()
-            exit()
-            break
+            break  # Result in child terminating and tripping of watchdog
+
+        sleep(0.2)  # This might need changing or putting in config
+
+        ret, frame2 = cap.read()
+
+        # if frame is read correctly ret is True
+        if not ret:
+            print("Can't receive frame (stream end?). Exiting ...")
+            cap.release()
+            break  # Result in child terminating and tripping of watchdog
+
+        if frameCount == 0:
+            directly_save_image(webcamFile,frame1,lock)
 
         frameCount += 1
+        frameCount = frameCount % 1024
+
         framesBeingProcessed.value += 1  # Update watchdog
 
         if debug:
             print("framesBeingProcessed set:", framesBeingProcessed.value)
 
-        gray = cv.cvtColor(frame, cv.COLOR_BGR2GRAY)
+        gray1 = cv.cvtColor(frame1, cv.COLOR_BGR2GRAY)
+        gray2 = cv.cvtColor(frame2, cv.COLOR_BGR2GRAY)
 
-        #   First time through there isn't an earlier image
-        #   so force comparison with itself.
-
-        if First:
-            oldgray = gray
-            First = False
-            num_diff = 0
-            avDiff = 0
-        else:
-            #       Difference this image with the last one
-
-            difference = cv.absdiff(gray, oldgray)
-            num_diff = np.sum(difference)  # Calculate how far from a zero image we are
-
-        #   The value of num_diff varies noisily especially at low light levels so
-        #   consider keeping a more stable running average
-        # avDiff = avDiff * avDiffAlpha + num_diff * avDiffBeta
+        difference = cv.absdiff(gray1, gray2)
+        # Calculate how far from a zero image we are
+        num_diff = np.sum(difference)
 
         if debug:
             print(PixelDiffThreshold, num_diff)
 
         if PixelDiffThreshold < abs(num_diff):
-            q.put(frame)
+            q.put(frame2)
+            directly_save_image(webcamFile,frame2,lock) # Keep live image recent when changes occur
             if debug:
                 print("Motion detected, pushed frame", frameCount)
             sleep(sleepDelay)
             if frameLimit < q.qsize():
                 sleep(0.5)  # Prevent system overload
-                First = True  # Re-initialise after delay
 
         sleep(0.25)
-        oldgray = gray
 
     # When everything done, release the capture
 
@@ -475,7 +492,6 @@ import shutil
 def RunningLow(folder, limit):
     debug = False
 
-
     try:
         total, used, free = shutil.disk_usage(folder)
     except:
@@ -521,10 +537,12 @@ def make_space(folder, limit):
         delete_oldest(folder)
         delete_oldest(folder)
 
+
 # Stage 3 of our image pipeline. We have something worth saving
 # so set about keeping it.
 
-import filenames 
+import filenames
+
 
 def preserve(ib, lock):
     debug = False
@@ -545,7 +563,9 @@ def preserve(ib, lock):
 
         timestamp = filenames.timestampedFilename()
 
-        outname = filenames.imageName(NumberPics, jpeg_store, node, frameCount, timestamp, False)
+        outname = filenames.imageName(
+            NumberPics, jpeg_store, node, frameCount, timestamp, False
+        )
 
         if debug:
             print("Save image", outname)
@@ -553,7 +573,6 @@ def preserve(ib, lock):
         #   Save file locally
 
         acq = lock.acquire(block=True)
-
         image.save(outname)
 
         #   Try to send over the internet
@@ -580,9 +599,6 @@ def preserve(ib, lock):
         )  # Make these wrap around so they don't used unbounded levels of storage
 
         lock.release()
-
-
-
 
 
 # reTransmit - which is in fact a misnomer it's more like retry
@@ -727,7 +743,7 @@ def main():
 
     # Create instances of the Process class, one for each function
 
-    p1 = Process(target=generate, args=(q,))
+    p1 = Process(target=generate, args=(q, fileLock))
 
     p2 = Process(
         target=analyse,
