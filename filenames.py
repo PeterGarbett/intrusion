@@ -29,15 +29,36 @@ def timestampedFilename():
 
 
 def imageName(numberPics, dirname, node, count, timestamp, local):
+
+    debug = False
+
+    if debug:
+        print(
+        "imagename input: numberpics: ",
+        numberPics,
+        "dir:",
+        dirname,
+        "node:",
+        node,
+        "<count:",
+        count,
+        "timestamp:",
+        timestamp,
+        "\n`local:",
+        local,
+    )
+
     if local:
-        here = "local_"
+        here = "_local_"
     else:
-        here = ""
+        here = "_"
 
     if numberPics:
-        outname = dirname + here + "m" + str(node) + "_" + str(count) + ".jpg"
+        outnameStart = dirname + str(count)
     else:
-        outname = dirname + here + "m" + str(node) + "_" + timestamp + ".jpg"
+        outnameStart = dirname + timestamp
+
+    outname = outnameStart + here + "lb" + str(node) + ".jpg"
 
     return outname
 
@@ -52,24 +73,38 @@ import os
 
 def parseFilename(numberPics, name):
 
+    debug = False
+
+    if debug:
+        print("Parsei filename:", name)
+
     filename, file_ext = os.path.splitext(name)
 
     base, fname = os.path.split(filename)
     base = base + "/"
     nameList = fname
-    MandNode = fname.split("_")[0]
+    MandNode = fname.split("_")[-1]
+
+    if debug:
+        print("Machine Node", MandNode)
 
     #   Should be an 'm' followed by at least one digit
 
     if len(MandNode) < 2:
         return ""
 
-    #   Leading with an 'm'
+    #   Leading with 'lb'
 
-    if MandNode[0] != "m":
+    if MandNode[0] != "l":
         return ""
 
-    nodestr = MandNode[1:]
+    if MandNode[1] != "b":
+        return ""
+
+    nodestr = MandNode[2:]
+
+    if debug:
+        print("Node:", nodestr)
 
     try:
         node = int(nodestr)
@@ -79,26 +114,51 @@ def parseFilename(numberPics, name):
     if len(nameList) < 3:
         return ""
     else:
-        stamp = nameList[3:]
+        stamp = nameList
+
+    #   Stamp is either count or time separted by underscores
+    #   depending on numberPics
+
+    if debug:
+        print("machine and node:", MandNode)
+        print("stamp:", stamp)
+
+    picIdent = stamp.replace(MandNode, "")
+    picIdent = picIdent.replace("local", "")
+    picIdent = picIdent.rstrip("_")
+
+    if debug:
+        print("picture ident:", picIdent)
 
     # If we remove the underscores we should be left with only digits
 
-    if not stamp.replace("_", "").isnumeric():
+    if not picIdent.replace("_", "").isnumeric():
         return ""
 
-    newname = imageName(numberPics, base, node, stamp, stamp, True)
+    newname = imageName(numberPics, base, node, picIdent, picIdent, True)
 
     return newname
 
 
 def main():
 
-    filename = "/home/peter/m1_2024_03_06_14_24_21_423461.jpg"
+    filename = "/home/peter/2024_03_06_14_24_21_423461_lb42.jpg"
+    print("Old name:", filename)
     new = parseFilename(False, filename)
-    print(new)
-    filename = "/home/peter/m1_2.jpg"
+    print("newname:", new)
+    filename = "/home/peter/123456789_lb21.jpg"
+    print("Old name:", filename)
     new = parseFilename(True, filename)
-    print(new)
+    print("newname:", new)
+
+    filename = "/home/peter/2024_03_06_14_24_21_423461_local_lb42.jpg"
+    print("Old name:", filename)
+    new = parseFilename(False, filename)
+    print("newname:", new)
+    filename = "/home/peter/123456789_local_lb21.jpg"
+    print("Old name:", filename)
+    new = parseFilename(True, filename)
+    print("newname:", new)
 
 
 if __name__ == "__main__":
