@@ -660,7 +660,7 @@ def reTransmit(lock):
         #   If we succeed then rename the file as local... implying it also exists remotely
 
         if scp_status:
-            newname = filenames.parseFilename(NumberPics, outname)
+            newname = filenames.addInLocalToFilename(NumberPics, outname)
 
             if newname != "":
                 os.rename(outname, newname)
