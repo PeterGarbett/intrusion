@@ -650,7 +650,11 @@ def reTransmit(lock):
 #   Find all candidates... would be more efficient just to find the first
 
         candidates = [x for x in imgnames if "local" not in x]
-        outname = candidates[0]
+
+        if 0 == len(candidates) :
+            continue
+        else:
+            outname = candidates[0]
 
         if True:
             print("reTransmit:", outname)
