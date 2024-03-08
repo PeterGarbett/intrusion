@@ -638,17 +638,21 @@ def reTransmit(lock):
             jpeg_store, LocalSizeLimit
         )  # Check filesystem size and delete if necessary
 
-        # get files not starting local
+        # get candidate image files (excluding live) 
+        # This only works well with timestaamped files
 
-        imgnames = sorted(glob.glob(jpeg_store + "m*.jpg"))
+        imgnames = sorted(glob.glob(jpeg_store + "2*.jpg"))
 
         if len(imgnames) == 0:
             lock.release()
             continue
 
-        outname = imgnames[0]
+#   Find all candidates... would be more efficient just to find the first
 
-        if debug:
+        candidates = [x for x in imgnames if "local" not in x]
+        outname = candidates[0]
+
+        if True:
             print("reTransmit:", outname)
 
         scp_status = send_file(outname)
