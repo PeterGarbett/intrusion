@@ -367,7 +367,7 @@ def generate(q, lock):
             if frameLimit < q.qsize():
                 sleep(0.5)  # Prevent system overload
 
-        sleep(0.25)
+        sleep(0.5)
 
     # When everything done, release the capture
 
@@ -606,8 +606,8 @@ def preserve(ib, lock):
 # This is intended to be a background task and would come into play
 # if the connection to the remote machine went down transiently
 # I assumme here we aren't sending data out to a machine on the LAN
-# the main case of interest is lost inetrnet, so we test for it
-# now working 1st
+# the main case of interest is lost internet, so we test for it
+# working 1st
 
 
 import glob
@@ -652,6 +652,7 @@ def reTransmit(lock):
         candidates = [x for x in imgnames if "local" not in x]
 
         if 0 == len(candidates) :
+            lock.release()
             continue
         else:
             outname = candidates[0]
@@ -838,14 +839,6 @@ def main():
                 p.terminate()
 
     #   These processes never terminate under normal operation
-
-    # Wait for processes to finish
-
-    p1.join()
-    p2.join()
-    p3.join()
-    p4.join()
-
 
 if __name__ == "__main__":
     main()
