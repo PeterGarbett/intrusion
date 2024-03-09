@@ -30,7 +30,7 @@ def timestampedFilename():
 
 def imageName(numberPics, dirname, node, count, timestamp, local):
 
-    debug = True
+    debug = False
 
     if debug:
         print(
@@ -73,7 +73,7 @@ import os
 
 def addInLocalToFilename(numberPics, name, returnIdent):
 
-    debug = True
+    debug = False
 
     if debug:
         print("Parse filename:", name)
