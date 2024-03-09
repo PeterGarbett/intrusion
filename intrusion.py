@@ -244,6 +244,7 @@ def directly_save_image(webcamFile,frame,lock):
     acq = lock.acquire(block=False)
     if acq:
         image.save(webcamFile)
+        scp_status = send_file(webcamFile)
         lock.release()
 
 
@@ -459,6 +460,7 @@ from scp import SCPClient
 
 
 def send_file(filename):
+
     debug = False
 
     sent = True
@@ -639,7 +641,7 @@ def reTransmit(lock):
         )  # Check filesystem size and delete if necessary
 
         # get candidate image files (excluding live) 
-        # This only works well with timestaamped files
+        # This only works well with timestamped files
 
         imgnames = sorted(glob.glob(jpeg_store + "2*.jpg"))
 
@@ -828,6 +830,7 @@ def main():
             framesBeingProcessed.value == 0
             or yoloAnalysisActive.value == 0
             or filestoreActive.value == 0
+            or retransmissionActive.value == 0
         ):
             print("processing has stopped, exiting anticipating a restart")
             print("loop count for frame generate:", framesBeingProcessed.value)
