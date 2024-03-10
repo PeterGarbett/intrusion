@@ -238,13 +238,31 @@ def configure():
 #   difference consequtive images and sum the pixel values
 #   see if this exceeds a threshold
 
+import datetime
 
-def directly_save_image(webcamFile,frame,lock):
-    image = im.fromarray(frame)
-    acq = lock.acquire(block=False)
+# Set initial time to expire timer immediatly
+
+live_image_time_saved = datetime.datetime.now() - datetime.timedelta(minutes=40)
+
+# This is to save the "live.jpg" image at reasonable intervals
+# Which bypasses the normal pipeline
+
+
+def directly_save_image(webcamFile, frame, lock):
+    global live_image_time_saved
+
+    acq = lock.acquire(block=False)  # Do this if we can but don't get in the way
+
     if acq:
-        image.save(webcamFile)
-        scp_status = send_file(webcamFile)
+        timeExpired = (
+            datetime.timedelta(minutes=30)
+            < datetime.datetime.now() - live_image_time_saved
+        )
+        if timeExpired:
+            image = im.fromarray(frame)
+            image.save(webcamFile)
+            scp_status = send_file(webcamFile)
+            live_image_time_saved = datetime.datetime.now()
         lock.release()
 
 
@@ -278,7 +296,6 @@ def generate(q, lock):
     print(".ssh directory :", sshKeyLoc)
 
     # "sort of" live output`
-
 
     print("Live(ish) output on :", webcamFile)
 
@@ -338,11 +355,11 @@ def generate(q, lock):
             cap.release()
             break  # Result in child terminating and tripping of watchdog
 
-        if frameCount == 0:
-            directly_save_image(webcamFile,frame1,lock)
+        if frameCount == 0:  # Only check on this at a slowish rate
+            directly_save_image(webcamFile, frame1, lock)
 
         frameCount += 1
-        frameCount = frameCount % 1024
+        frameCount = frameCount % 8192
 
         framesBeingProcessed.value += 1  # Update watchdog
 
@@ -361,7 +378,9 @@ def generate(q, lock):
 
         if PixelDiffThreshold < abs(num_diff):
             q.put(frame2)
-            directly_save_image(webcamFile,frame2,lock) # Keep live image recent when changes occur
+            directly_save_image(
+                webcamFile, frame2, lock
+            )  # Keep live image recent when changes occur
             if debug:
                 print("Motion detected, pushed frame", frameCount)
             sleep(sleepDelay)
@@ -640,7 +659,7 @@ def reTransmit(lock):
             jpeg_store, LocalSizeLimit
         )  # Check filesystem size and delete if necessary
 
-        # get candidate image files (excluding live) 
+        # get candidate image files (excluding live)
         # This only works well with timestamped files
 
         imgnames = sorted(glob.glob(jpeg_store + "2*.jpg"))
@@ -649,11 +668,11 @@ def reTransmit(lock):
             lock.release()
             continue
 
-#   Find all candidates... would be more efficient just to find the first
+        #   Find all candidates... would be more efficient just to find the first
 
         candidates = [x for x in imgnames if "local" not in x]
 
-        if 0 == len(candidates) :
+        if 0 == len(candidates):
             lock.release()
             continue
         else:
@@ -667,7 +686,7 @@ def reTransmit(lock):
         #   If we succeed then rename the file as local... implying it also exists remotely
 
         if scp_status:
-            newname = filenames.addInLocalToFilename(NumberPics, outname,False)
+            newname = filenames.addInLocalToFilename(NumberPics, outname, False)
 
             if newname != "":
                 os.rename(outname, newname)
@@ -842,6 +861,7 @@ def main():
                 p.terminate()
 
     #   These processes never terminate under normal operation
+
 
 if __name__ == "__main__":
     main()
