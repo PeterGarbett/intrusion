@@ -255,7 +255,7 @@ def directly_save_image(webcamFile, frame, lock):
 
     if acq:
         timeExpired = (
-            datetime.timedelta(minutes=30)
+            datetime.timedelta(minutes=60)
             < datetime.datetime.now() - live_image_time_saved
         )
         if timeExpired:
@@ -359,7 +359,7 @@ def generate(q, lock):
             directly_save_image(webcamFile, frame1, lock)
 
         frameCount += 1
-        frameCount = frameCount % 8192
+        frameCount = frameCount % 1024
 
         framesBeingProcessed.value += 1  # Update watchdog
 
