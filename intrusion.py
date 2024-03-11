@@ -242,7 +242,7 @@ import datetime
 
 # Set initial time to expire timer immediatly
 
-live_image_time_saved = datetime.datetime.now() - datetime.timedelta(minutes=40)
+live_image_time_saved = datetime.datetime.now() - datetime.timedelta(minutes=70)
 
 # This is to save the "live.jpg" image at reasonable intervals
 # Which bypasses the normal pipeline
@@ -535,8 +535,14 @@ def delete_oldest(folder):
     # have to perform the delete operation
     # changing the current working directory
     # to the folder specified
+    # Protect from exception in case this doesn't exist
+    # to protect us from removal of inappropriate file
 
-    os.chdir(os.path.join(os.getcwd(), folder))
+    try:
+        os.chdir(os.path.join(os.getcwd(), folder))
+    except Exception as e:
+        print(e)
+        return
 
     list_of_files = os.listdir(".")
     if len(list_of_files) == 0:
@@ -548,7 +554,11 @@ def delete_oldest(folder):
         print("Oldest data file", folder + oldest_file, " to be deleted")
 
     if not SuppressDeletion:
-        os.remove(os.path.abspath(folder + oldest_file))
+        try:
+            os.remove(os.path.abspath(folder + oldest_file))
+        except Exception as e:
+            print(e)
+            return
 
 
 def make_space(folder, limit):
