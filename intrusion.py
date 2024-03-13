@@ -66,7 +66,7 @@ high_def = None
 jpeg_store = ""
 
 SuppressDeletion = False  # True     # Dry run for test purposes
-LocalSizeLimit = 1 * 2 ** 30  # bytes required free
+LocalSizeLimit = 1 * 2**30  # bytes required free
 NumberPics = False  # Good for debugging, as an alternative to timestamps
 
 # Remote filestore
@@ -105,7 +105,6 @@ import copySSHKeys
 
 
 def configure():
-
     # These variables are in the same global scope as main so multiprocessing aspects don't arise
 
     global user
@@ -258,7 +257,6 @@ def directly_save_image(webcamFile, frame, lock):
             < datetime.datetime.now() - live_image_time_saved
         )
         if timeExpired:
-
             # Convert to RGB
 
             cols = cv.cvtColor(frame, cv.COLOR_BGR2RGB)
@@ -282,7 +280,6 @@ def directly_save_image(webcamFile, frame, lock):
 
 
 def generate(q, lock):
-
     # Some configuration values
 
     debug = False
@@ -348,7 +345,6 @@ def generate(q, lock):
     # video frame capture loop
 
     while True:
-
         # Read two images with a gap between to improve reliability of
         # motion detection. Should really be some sort of critical section
 
@@ -457,11 +453,9 @@ def lifeforms_scan(frame):
 
 
 def analyse(q, ib):
-
     debug = False
 
     while True:
-
         yoloAnalysisActive.value += 1
 
         try:
@@ -497,7 +491,6 @@ from scp import SCPClient
 
 
 def send_file(filename):
-
     debug = False
 
     sent = True
@@ -537,7 +530,7 @@ def RunningLow(folder, limit):
         return False
 
     if debug:
-        print("Free: %d GiB" % (free // (2 ** 30)))
+        print("Free: %d GiB" % (free // (2**30)))
 
     if free < limit:
         return True
@@ -546,7 +539,6 @@ def RunningLow(folder, limit):
 
 
 def delete_oldest(folder):
-
     debug = False
 
     # folder is the name of the folder in which we
@@ -599,7 +591,6 @@ def preserve(ib, lock):
     frameCount = 0
 
     while True:
-
         filestoreActive.value += 1
 
         try:
@@ -665,7 +656,6 @@ import os
 
 
 def reTransmit(lock):
-
     debug = False
 
     while True:
@@ -803,9 +793,10 @@ def main():
 
     # Create instances of the Process class, one for each function
 
-    p1 = Process(target=generate, args=(q, fileLock))
+    p1 = Process(name="MotionDetect", target=generate, args=(q, fileLock))
 
     p2 = Process(
+        name="yoloFilter",
         target=analyse,
         args=(
             q,
@@ -814,6 +805,7 @@ def main():
     )
 
     p3 = Process(
+        name="fileStore",
         target=preserve,
         args=(
             ib,
@@ -821,7 +813,7 @@ def main():
         ),
     )
 
-    p4 = Process(target=reTransmit, args=(fileLock,))
+    p4 = Process(name="remoteCopy", target=reTransmit, args=(fileLock,))
 
     # Start processes
     p1.start()
@@ -841,7 +833,6 @@ def main():
     #        print(parentPID,P1PID,P2PID,P3PID,P4PID)
 
     while True:
-
         # Check children are all (nominally) active
 
         childCount = 0
