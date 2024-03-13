@@ -3,15 +3,9 @@
 # A primitive reminder of where things should go
 
 cp intrusion.service /etc/systemd/system/
-cp intrusion.py /usr/local/bin/
-cp readfile_ignore_comments.py /usr/local/bin/
-cp filenames.py /usr/local/bin/
-cp copySSHKeys.py /usr/local/bin/
 
 #mkdir /etc/intrusion
 #cp intrusion.conf /etc/intrusion/
-
-chmod +x /usr/local/bin/intrusion.py
 #systemctl enable intrusion
 systemctl start intrusion
 
