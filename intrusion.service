@@ -6,7 +6,7 @@
 #
 [Unit]
 Description=Yolo filtered motion triggered snapshots
-After=mount-usb
+Wants=mount-usb.service
 
 [Service]
 Type=exec
