@@ -278,6 +278,7 @@ def directly_save_image(webcamFile, frame, lock):
             live_image_time_saved = datetime.datetime.now()
         lock.release()
 
+import sys
 
 def generate(q, lock):
     # Some configuration values
@@ -306,6 +307,8 @@ def generate(q, lock):
     print("Use timestamps:", not numberPics)
     print("New .ssh directory contents:", newKeyDir)
     print(".ssh directory :", sshKeyLoc)
+
+    sys.stdout.flush()  # Make sure we see the above immediatly in the systemd log
 
     # "sort of" live output`
 
