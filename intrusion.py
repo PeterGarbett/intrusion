@@ -636,6 +636,7 @@ def preserve(ib, lock):
             newname = filenames.imageName(
                 NumberPics, jpeg_store, node, frameCount, timestamp, True
             )
+            os.system("touch " + newname)  # if inotify is watching prod it
             os.rename(outname, newname)
             if debug:
                 print("File renamed from", outname, " to ", newname)
@@ -718,6 +719,7 @@ def reTransmit(lock):
             newname = filenames.addInLocalToFilename(NumberPics, outname, False)
 
             if newname != "":
+                os.system("touch " + newname)  # if inotify is watching prod it
                 os.rename(outname, newname)
                 if debug:
                     print("File renamed from", outname, " to ", newname)
