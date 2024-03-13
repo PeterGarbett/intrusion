@@ -244,7 +244,7 @@ import datetime
 
 live_image_time_saved = datetime.datetime.now() - datetime.timedelta(minutes=70)
 
-# This is to save the "live.jpg" image at reasonable intervals
+# This is to save the "testSnapshot.jpg" image at reasonable intervals
 # Which bypasses the normal pipeline
 
 
@@ -259,9 +259,25 @@ def directly_save_image(webcamFile, frame, lock):
             < datetime.datetime.now() - live_image_time_saved
         )
         if timeExpired:
-            image = im.fromarray(frame)
+
+            # Convert to RGB
+
+            cols = cv.cvtColor(frame, cv.COLOR_BGR2RGB)
+
+            # Convert to image
+
+            image = im.fromarray(cols)
+
+            # Save locally
+
             image.save(webcamFile)
+
+            # Send elsewhere
+
             scp_status = send_file(webcamFile)
+
+            # Record when
+
             live_image_time_saved = datetime.datetime.now()
         lock.release()
 
@@ -272,7 +288,7 @@ def generate(q, lock):
 
     debug = False
 
-    webcamFile = jpeg_store + "live.jpg"
+    webcamFile = jpeg_store + "testSnapshot.jpg"
 
     if high_def:
         width = 1920
@@ -457,9 +473,12 @@ def analyse(q, ib):
 
         if debug:
             print("analyse image")
-        cols = cv.cvtColor(item, cv.COLOR_BGR2RGB)
 
-        if lifeforms_scan(cols):
+        #   Yolo is done in grayscale so no point in doing RGB
+        #   if we don't have too
+
+        if lifeforms_scan(item):
+            cols = cv.cvtColor(item, cv.COLOR_BGR2RGB)
             ib.put(cols)
             if debug:
                 print("Lifeforms exist!")
