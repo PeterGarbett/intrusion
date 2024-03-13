@@ -5,12 +5,14 @@
 #	and expect tshito restart us	
 #
 [Unit]
-Description=motion triggered snapshots
+Description=Yolo filtered motion triggered snapshots
 
 [Service]
-Type=simple
-ExecStart=/usr/local/bin/intrusion.py
+Type=exec
+ExecStart=/home/embed/intrusion/intrusion.py
 User=peter
+CPUSchedulingPolicy=fifo
+CPUSchedulingPriority=80
 Restart=always
 RestartSec=50s
 
