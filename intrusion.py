@@ -715,6 +715,8 @@ def reTransmit(lock):
                 os.rename(outname, newname)
                 if debug:
                     print("File renamed from", outname, " to ", newname)
+        else:
+            sleep(1024)
 
         lock.release()
 
