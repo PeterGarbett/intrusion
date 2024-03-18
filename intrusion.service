@@ -10,7 +10,8 @@ Wants=mount-usb.service
 
 [Service]
 Type=exec
-ExecStart=/home/embed/intrusion/bin/python3 /home/embed/intrusion/intrusion.py
+ExecStart=/home/embed/intrusion/camera
+#/home/embed/intrusion/bin/python3 /home/embed/intrusion/intrusion.py
 User=embed
 CPUSchedulingPolicy=fifo
 CPUSchedulingPriority=80
