@@ -2,7 +2,7 @@
 #	This file needs to be on /etc/systemd/system/
 #	Restart is chosen because we terminate only
 #	on failure where we kill our own children and exit
-#	and expect tshito restart us	
+#	and expect systemd to  restart us	
 #
 [Unit]
 Description=Yolo filtered motion triggered snapshots
