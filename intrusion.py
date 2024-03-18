@@ -81,7 +81,7 @@ sleepDelay = 1.0  # Time to look away after a motion detect to avoid overloads
 # Avoid generating massive queues
 
 frameLimit = 15
-frameDelay = 30
+frameDelay = 3
 
 # Subprocess rate limiting
 
@@ -407,8 +407,8 @@ def generate(q, lock):
             if debug:
                 print("Motion detected, pushed frame", frameCount)
             sleep(sleepDelay)
-            if frameLimit1 < q.qsize():
-                sleep(frameDelay1)  # Prevent system overload
+            while frameLimit < q.qsize():
+                sleep(frameDelay)  # Prevent system overload
 
         sleep(0.5)
 
