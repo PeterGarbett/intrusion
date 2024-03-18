@@ -66,7 +66,7 @@ high_def = None
 jpeg_store = ""
 
 SuppressDeletion = False  # True     # Dry run for test purposes
-LocalSizeLimit = 1 * 2**30  # bytes required free
+LocalSizeLimit = 1 * 2 ** 30  # bytes required free
 NumberPics = False  # Good for debugging, as an alternative to timestamps
 
 # Remote filestore
@@ -77,7 +77,11 @@ path = ""
 
 Trigger = 1.8  # Roughly, the percentage change that triggers a snapshot
 sleepDelay = 1.0  # Time to look away after a motion detect to avoid overloads
-frameLimit = 10
+
+# Avoid generating massive queues
+
+frameLimit = 15
+frameDelay = 30
 
 # Subprocess rate limiting
 
@@ -278,7 +282,9 @@ def directly_save_image(webcamFile, frame, lock):
             live_image_time_saved = datetime.datetime.now()
         lock.release()
 
+
 import sys
+
 
 def generate(q, lock):
     # Some configuration values
@@ -322,10 +328,10 @@ def generate(q, lock):
     avDiffAlpha = 0.0  # Near 0 means ndiff dominates
     avDiffBeta = 1 - avDiffAlpha
 
-    #   Something like 10 percent of all the pixels 
+    #   Something like 10 percent of all the pixels
     #   Changed to be changed pixels. hopefully less dependent on brightness
 
-    PixelDiffThreshold =  width * height * Trigger / 100
+    PixelDiffThreshold = width * height * Trigger / 100
 
     #   Setup video capture
     #   the 0 lets opencv figure it out which it does nicely when there
@@ -389,9 +395,11 @@ def generate(q, lock):
         fudge = 2.0
 
         if debug:
-            print(PixelDiffThreshold, num_diff,fudge*PixelDiffThreshold < abs(num_diff))
+            print(
+                PixelDiffThreshold, num_diff, fudge * PixelDiffThreshold < abs(num_diff)
+            )
 
-        if fudge*PixelDiffThreshold < abs(num_diff):
+        if fudge * PixelDiffThreshold < abs(num_diff):
             q.put(frame2)
             directly_save_image(
                 webcamFile, frame2, lock
@@ -399,8 +407,8 @@ def generate(q, lock):
             if debug:
                 print("Motion detected, pushed frame", frameCount)
             sleep(sleepDelay)
-            if frameLimit < q.qsize():
-                sleep(0.5)  # Prevent system overload
+            if frameLimit1 < q.qsize():
+                sleep(frameDelay1)  # Prevent system overload
 
         sleep(0.5)
 
@@ -538,7 +546,7 @@ def RunningLow(folder, limit):
         return False
 
     if debug:
-        print("Free: %d GiB" % (free // (2**30)))
+        print("Free: %d GiB" % (free // (2 ** 30)))
 
     if free < limit:
         return True
