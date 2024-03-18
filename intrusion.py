@@ -322,10 +322,10 @@ def generate(q, lock):
     avDiffAlpha = 0.0  # Near 0 means ndiff dominates
     avDiffBeta = 1 - avDiffAlpha
 
-    #   Something like 10 percent of all the pixels whose
-    #   values are 0 to 256.  A guess validated by experiment
+    #   Something like 10 percent of all the pixels 
+    #   Changed to be changed pixels. hopefully less dependent on brightness
 
-    PixelDiffThreshold = 128 * width * height * Trigger / 100
+    PixelDiffThreshold =  width * height * Trigger / 100
 
     #   Setup video capture
     #   the 0 lets opencv figure it out which it does nicely when there
@@ -384,13 +384,14 @@ def generate(q, lock):
         gray2 = cv.cvtColor(frame2, cv.COLOR_BGR2GRAY)
 
         difference = cv.absdiff(gray1, gray2)
-        # Calculate how far from a zero image we are
-        num_diff = np.sum(difference)
+        # Calculate changed pixels
+        num_diff = cv.countNonZero(difference)
+        fudge = 2.0
 
         if debug:
-            print(PixelDiffThreshold, num_diff)
+            print(PixelDiffThreshold, num_diff,fudge*PixelDiffThreshold < abs(num_diff))
 
-        if PixelDiffThreshold < abs(num_diff):
+        if fudge*PixelDiffThreshold < abs(num_diff):
             q.put(frame2)
             directly_save_image(
                 webcamFile, frame2, lock
@@ -430,6 +431,7 @@ import sys
 
 
 def lifeforms_scan(frame):
+
     debug = False
 
     # Need an entry point that takes an image
@@ -456,6 +458,7 @@ def lifeforms_scan(frame):
 
 
 def analyse(q, ib):
+
     debug = False
 
     while True:
@@ -499,6 +502,8 @@ def send_file(filename):
     sent = True
 
     try:
+        if debug:
+            print("scp file")
         client = paramiko.SSHClient()
         client.load_system_host_keys()
         client.connect(hostname, username=user)
@@ -589,6 +594,7 @@ import filenames
 
 
 def preserve(ib, lock):
+
     debug = False
 
     frameCount = 0
