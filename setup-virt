@@ -1,0 +1,10 @@
+#
+#	The bits we need to generate a virtual environment
+#
+virtualenv .
+source ./bin/activate
+pip install numpy
+pip install opencv-python
+pip install pillow
+pip install paramiko
+
