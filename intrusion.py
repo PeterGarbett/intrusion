@@ -75,7 +75,7 @@ user = ""
 hostname = ""
 path = ""
 
-Trigger = 1.8  # Roughly, the percentage change that triggers a snapshot
+Trigger = 5  # Roughly, the percentage change that triggers a snapshot
 sleepDelay = 1.0  # Time to look away after a motion detect to avoid overloads
 
 # Avoid generating massive queues
@@ -331,7 +331,7 @@ def generate(q, lock):
     #   Something like 10 percent of all the pixels
     #   Changed to be changed pixels. hopefully less dependent on brightness
 
-    PixelDiffThreshold = width * height * Trigger / 100
+    PixelDiffThreshold = 128 * width * height * Trigger / 100
 
     #   Setup video capture
     #   the 0 lets opencv figure it out which it does nicely when there
@@ -390,17 +390,22 @@ def generate(q, lock):
         gray2 = cv.cvtColor(frame2, cv.COLOR_BGR2GRAY)
 
         difference = cv.absdiff(gray1, gray2)
-        # Calculate changed pixels
-        num_diff = cv.countNonZero(difference)
-        fudge = 2.0
+        # Calculate changed pixels with account taken for their change in value
+        num_diff = np.sum(difference)
 
         if debug:
+            num_diffNZ = cv.countNonZero(difference)
             print(
-                PixelDiffThreshold, num_diff, fudge * PixelDiffThreshold < abs(num_diff)
+                PixelDiffThreshold,
+                num_diff,
+                num_diffNZ,
+                PixelDiffThreshold < abs(num_diff),
             )
 
-        if fudge * PixelDiffThreshold < abs(num_diff):
-            q.put(frame2)
+        if PixelDiffThreshold < abs(num_diff):
+            timestamp = filenames.timestampedFilename()
+            qitem = (frame2, timestamp)
+            q.put(qitem)
             directly_save_image(
                 webcamFile, frame2, lock
             )  # Keep live image recent when changes occur
@@ -473,10 +478,12 @@ def analyse(q, ib):
         yoloAnalysisActive.value += 1
 
         try:
-            item = q.get_nowait()
+            frameAndStamp = q.get_nowait()
         except queue.Empty:
             sleep(window)
             continue
+
+        item = frameAndStamp[0]
 
         if debug:
             print("analyse image")
@@ -485,8 +492,7 @@ def analyse(q, ib):
         #   if we don't have too
 
         if lifeforms_scan(item):
-            cols = cv.cvtColor(item, cv.COLOR_BGR2RGB)
-            ib.put(cols)
+            ib.put(frameAndStamp)
             if debug:
                 print("Lifeforms exist!")
         else:
@@ -611,14 +617,14 @@ def preserve(ib, lock):
         filestoreActive.value += 1
 
         try:
-            frame = ib.get_nowait()
+            frameAndStamp = ib.get_nowait()
         except queue.Empty:
             sleep(window2)
             continue
 
+        frame = cv.cvtColor(frameAndStamp[0], cv.COLOR_BGR2RGB)
+        timestamp = frameAndStamp[1]
         image = im.fromarray(frame)
-
-        timestamp = filenames.timestampedFilename()
 
         outname = filenames.imageName(
             NumberPics, jpeg_store, node, frameCount, timestamp, False
