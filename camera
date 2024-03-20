@@ -1,7 +1,5 @@
 #!/bin/bash
+#	Disable creative Live auto exposure
 #
-#
-#	Place camera specific controls here
-#
-#v4l2-ctl -d /dev/video0 --set-ctrl=auto_exposure=1
-/home/embed/intrusion/bin/python3 /home/embed/intrusion/intrusion.py
+#sudo  v4l2-ctl -d /dev/video0 --set-ctrl=auto_exposure=1
+$HOME/intrusion/bin/python3 $HOME/intrusion/intrusion.py
