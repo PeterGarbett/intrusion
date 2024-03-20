@@ -469,8 +469,13 @@ def lifeforms_scan(frame):
 # Analyse image using yolo
 # If its interesting put it on queue 'ib'
 
+rejects = 0
+foundSomeone = 0
 
 def analyse(q, ib):
+    global rejects
+    global foundSomeone
+    global Trigger
 
     debug = False
 
@@ -493,11 +498,18 @@ def analyse(q, ib):
 
         if lifeforms_scan(item):
             ib.put(frameAndStamp)
+            foundSomeone += 1
             if debug:
                 print("Lifeforms exist!")
         else:
+            rejects += 1
             if debug:
                 print("No lifeforms!!")
+
+        if 0 == (rejects + foundSomeone) % 1024:
+            successRate = foundSomeone / (rejects + foundSomeone)
+            print("Success rate:", successRate, " Trigger level:", Trigger)
+
 
 
 # Send image to somewhere non-local using scp
