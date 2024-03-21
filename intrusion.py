@@ -66,7 +66,7 @@ high_def = None
 jpeg_store = ""
 
 SuppressDeletion = False  # True     # Dry run for test purposes
-LocalSizeLimit = 1 * 2 ** 30  # bytes required free
+LocalSizeLimit = 1 * 2**30  # bytes required free
 NumberPics = False  # Good for debugging, as an alternative to timestamps
 
 # Remote filestore
@@ -97,6 +97,7 @@ framesBeingProcessed = multiprocessing.Value("i", 0)
 yoloAnalysisActive = multiprocessing.Value("i", 0)
 filestoreActive = multiprocessing.Value("i", 0)
 retransmissionActive = multiprocessing.Value("i", 0)
+
 
 import copySSHKeys
 
@@ -287,6 +288,8 @@ import sys
 
 
 def generate(q, lock):
+    global framePairCount
+
     # Some configuration values
 
     debug = False
@@ -444,7 +447,6 @@ import sys
 
 
 def lifeforms_scan(frame):
-
     debug = False
 
     # Need an entry point that takes an image
@@ -471,13 +473,21 @@ def lifeforms_scan(frame):
 
 rejects = 0
 foundSomeone = 0
+#   Filename to log performance data
+
+perfLog = ""
+
 
 def analyse(q, ib):
     global rejects
     global foundSomeone
     global Trigger
+    global perfLog
 
     debug = False
+
+    if perfLog == "":
+        perfLog = jpeg_store + "perfLog_" + filenames.timestampedFilename() + ".txt"
 
     while True:
         yoloAnalysisActive.value += 1
@@ -508,8 +518,30 @@ def analyse(q, ib):
 
         if 0 == (rejects + foundSomeone) % 1024:
             successRate = foundSomeone / (rejects + foundSomeone)
-            print("Success rate:", successRate, " Trigger level:", Trigger)
-
+            try:
+                f = open(perfLog, "a+")
+                f.write(
+                    "Frame pairs :"
+                    + str(framesBeingProcessed.value)
+                    + " frames showing motion :"
+                    + str(rejects + foundSomeone)
+                    + " frames with people:"
+                    + str(foundSomeone)
+                    + " Success rate:"
+                    + str(successRate)
+                    + " Trigger level:"
+                    + str(Trigger)
+                    + "\n"
+                )
+                f.write(
+                    "Frames queued to analyse "
+                    + str(q.qsize())
+                    + " Frames queued to save:"
+                    + str(ib.qsize()+ "\n") 
+                )
+                f.close()
+            except Exception as e:
+                print(e)
 
 
 # Send image to somewhere non-local using scp
@@ -564,7 +596,7 @@ def RunningLow(folder, limit):
         return False
 
     if debug:
-        print("Free: %d GiB" % (free // (2 ** 30)))
+        print("Free: %d GiB" % (free // (2**30)))
 
     if free < limit:
         return True
@@ -620,7 +652,6 @@ import filenames
 
 
 def preserve(ib, lock):
-
     debug = False
 
     frameCount = 0
