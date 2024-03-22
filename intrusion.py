@@ -898,6 +898,9 @@ def main():
     P3PID = p3.pid
     P4PID = p4.pid
 
+    framesBeingProcessed.value = 0
+
+
     #        print(parentPID,P1PID,P2PID,P3PID,P4PID)
 
     while True:
