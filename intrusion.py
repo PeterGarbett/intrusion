@@ -66,7 +66,7 @@ high_def = None
 jpeg_store = ""
 
 SuppressDeletion = False  # True     # Dry run for test purposes
-LocalSizeLimit = 1 * 2**30  # bytes required free
+LocalSizeLimit = 1 * 2 ** 30  # bytes required free
 NumberPics = False  # Good for debugging, as an alternative to timestamps
 
 # Remote filestore
@@ -423,7 +423,6 @@ def generate(q, lock):
     # When everything done, release the capture
 
     cap.release()
-    cv.destroyAllWindows()
 
     exit(0)
 
@@ -537,7 +536,8 @@ def analyse(q, ib):
                     "Frames queued to analyse "
                     + str(q.qsize())
                     + " Frames queued to save:"
-                    + str(ib.qsize()+ "\n") 
+                    + str(ib.qsize())
+                    + "\n"
                 )
                 f.close()
             except Exception as e:
@@ -596,7 +596,7 @@ def RunningLow(folder, limit):
         return False
 
     if debug:
-        print("Free: %d GiB" % (free // (2**30)))
+        print("Free: %d GiB" % (free // (2 ** 30)))
 
     if free < limit:
         return True
