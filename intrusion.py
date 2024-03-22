@@ -917,7 +917,7 @@ def main():
 
         # Inspect a pulse for each process
 
-        framesBeingProcessed.value = 0
+        savedFrameCount = framesBeingProcessed.value
         yoloAnalysisActive.value = 0
         filestoreActive.value = 0
         retransmissionActive.value = 0  # Check this at a slower rate
@@ -935,7 +935,7 @@ def main():
             )  # Check this at a slower rate
 
         if (
-            framesBeingProcessed.value == 0
+            framesBeingProcessed.value == savedFrameCount
             or yoloAnalysisActive.value == 0
             or filestoreActive.value == 0
             or retransmissionActive.value == 0
