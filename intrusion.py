@@ -323,13 +323,6 @@ def generate(q, lock):
 
     print("Live(ish) output on :", webcamFile)
 
-    #
-    #   Difference between consequtive images is noisy especially in low light
-    #   Consider a Low pass filter
-    #
-    avDiff = 0
-    avDiffAlpha = 0.0  # Near 0 means ndiff dominates
-    avDiffBeta = 1 - avDiffAlpha
 
     #   Something like 10 percent of all the pixels
     #   Changed to be changed pixels. hopefully less dependent on brightness
