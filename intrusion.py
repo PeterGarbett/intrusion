@@ -66,7 +66,7 @@ high_def = None
 jpeg_store = ""
 
 SuppressDeletion = False  # True     # Dry run for test purposes
-LocalSizeLimit = 1 * 2 ** 30  # bytes required free
+LocalSizeLimit = 1 * 2**30  # bytes required free
 NumberPics = False  # Good for debugging, as an alternative to timestamps
 
 # Remote filestore
@@ -516,7 +516,6 @@ def analyse(q, ib):
                 print("No lifeforms!!")
 
         if 0 == (rejects + foundSomeone) % 1024:
-            successRate = foundSomeone / (rejects + foundSomeone)
             try:
                 f = open(perfLog, "a+")
                 f.write(
@@ -526,8 +525,6 @@ def analyse(q, ib):
                     + str(rejects + foundSomeone)
                     + " frames with people:"
                     + str(foundSomeone)
-                    + " Success rate:"
-                    + str(successRate)
                     + " Trigger level:"
                     + str(Trigger)
                     + "\n"
@@ -539,6 +536,9 @@ def analyse(q, ib):
                     + str(ib.qsize())
                     + "\n"
                 )
+                framesBeingProcessed.value = 0
+                rejects = 0
+                foundSomeone = 0
                 f.close()
             except Exception as e:
                 print(e)
@@ -596,7 +596,7 @@ def RunningLow(folder, limit):
         return False
 
     if debug:
-        print("Free: %d GiB" % (free // (2 ** 30)))
+        print("Free: %d GiB" % (free // (2**30)))
 
     if free < limit:
         return True
@@ -899,7 +899,6 @@ def main():
     P4PID = p4.pid
 
     framesBeingProcessed.value = 0
-
 
     #        print(parentPID,P1PID,P2PID,P3PID,P4PID)
 
