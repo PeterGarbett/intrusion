@@ -97,6 +97,8 @@ framesBeingProcessed = multiprocessing.Value("i", 0)
 yoloAnalysisActive = multiprocessing.Value("i", 0)
 filestoreActive = multiprocessing.Value("i", 0)
 retransmissionActive = multiprocessing.Value("i", 0)
+sensitivityChangeRequest = multiprocessing.Value("i", 0)
+
 
 import copySSHKeys
 
@@ -293,6 +295,8 @@ def generate(q, lock):
 
     debug = False
 
+    sensitivity = 0
+
     webcamFile = jpeg_store + "testSnapshot.jpg"
 
     if high_def:
@@ -414,6 +418,23 @@ def generate(q, lock):
         else:
             rejected += 1
 
+        #   Assess effectiveness of trigger level
+
+        powerRatio = detected / (detected + rejected)
+
+        initialSensitivity = sensitivity
+
+        if abs(powerRatio - 1.0) < 0.05:  # Almost all frames show movement
+            sensitivity = -1
+        else:
+            if abs(powerRatio) < 0.01:  # Fewer than 1% show movement
+                sensitivity = 1
+            else:
+                sensitivity = 0  # Leave alone
+
+        if initialSensitivity != sensitivity:
+            sensitivityChangeRequest.value = sensitivity
+
         sleep(0.5)
 
     # When everything done, release the capture
@@ -527,7 +548,8 @@ def analyse(q, ib):
                     + str(q.qsize())
                     + " Frames queued to save:"
                     + str(ib.qsize())
-                    + "\n"
+                    + "\n Sensitivity change suggested:"
+                    + str(sensitivityChangeRequest.value)
                 )
                 print("Performance data written on ", perfLog)
                 framesBeingProcessed.value = 0
