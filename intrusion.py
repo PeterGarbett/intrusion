@@ -98,7 +98,6 @@ yoloAnalysisActive = multiprocessing.Value("i", 0)
 filestoreActive = multiprocessing.Value("i", 0)
 retransmissionActive = multiprocessing.Value("i", 0)
 
-
 import copySSHKeys
 
 #
@@ -323,7 +322,6 @@ def generate(q, lock):
 
     print("Live(ish) output on :", webcamFile)
 
-
     #   Something like 10 percent of all the pixels
     #   Changed to be changed pixels. hopefully less dependent on brightness
 
@@ -346,6 +344,8 @@ def generate(q, lock):
 
     First = True
     frameCount = 0
+    detected = 0
+    rejected = 0
 
     # video frame capture loop
 
@@ -410,6 +410,9 @@ def generate(q, lock):
             sleep(sleepDelay)
             while frameLimit < q.qsize():
                 sleep(frameDelay)  # Prevent system overload
+            detected += 1
+        else:
+            rejected += 1
 
         sleep(0.5)
 
@@ -508,27 +511,25 @@ def analyse(q, ib):
             if debug:
                 print("No lifeforms!!")
 
-        if 0 == (rejects + foundSomeone) % 1024:
+        if 1024 <= framesBeingProcessed.value:
             try:
                 f = open(perfLog, "a+")
                 f.write(
-                    "Frame pairs :"
-                    + str(framesBeingProcessed.value)
-                    + " frames showing motion :"
-                    + str(rejects + foundSomeone)
-                    + " frames with people:"
-                    + str(foundSomeone)
-                    + " Trigger level:"
+                    "Trigger level:"
                     + str(Trigger)
-                    + "\n"
-                )
-                f.write(
-                    "Frames queued to analyse "
+                    + "\nFrame pairs:"
+                    + str(framesBeingProcessed.value)
+                    + " Frames with motion:"
+                    + str(rejects + foundSomeone)
+                    + " Frames with people:"
+                    + str(foundSomeone)
+                    + "\nFrames queued to analyse "
                     + str(q.qsize())
                     + " Frames queued to save:"
                     + str(ib.qsize())
                     + "\n"
                 )
+                print("Performance data written on ", perfLog)
                 framesBeingProcessed.value = 0
                 rejects = 0
                 foundSomeone = 0
