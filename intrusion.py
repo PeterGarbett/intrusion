@@ -66,7 +66,7 @@ high_def = None
 jpeg_store = ""
 
 SuppressDeletion = False  # True     # Dry run for test purposes
-LocalSizeLimit = 1 * 2**30  # bytes required free
+LocalSizeLimit = 1 * 2 ** 30  # bytes required free
 NumberPics = False  # Good for debugging, as an alternative to timestamps
 
 # Remote filestore
@@ -77,6 +77,7 @@ path = ""
 
 Trigger = 5  # Roughly, the percentage change that triggers a snapshot
 sleepDelay = 1.0  # Time to look away after a motion detect to avoid overloads
+frameCycle = 1024
 
 # Avoid generating massive queues
 
@@ -97,7 +98,7 @@ framesBeingProcessed = multiprocessing.Value("i", 0)
 yoloAnalysisActive = multiprocessing.Value("i", 0)
 filestoreActive = multiprocessing.Value("i", 0)
 retransmissionActive = multiprocessing.Value("i", 0)
-sensitivityChangeRequest = multiprocessing.Value("i", 0)
+sensitivityChange = multiprocessing.Value("f", 0)
 
 
 import copySSHKeys
@@ -226,6 +227,7 @@ def configure():
     if debug:
         print("Configuration values as read :")
         print("Trigger:", Trigger)
+        sensitivityChange.value = Trigger
         print("TriggerDelayTime(secs):", sleepDelay)
         print("LookFor:", lifeforms)
         print("Remote hostname", hostname)
@@ -288,8 +290,18 @@ def directly_save_image(webcamFile, frame, lock):
 import sys
 
 
+# Clamp a value between limits
+
+
+def clamp(n, minn, maxn):
+    n = minn if n <= minn else maxn if maxn <= n else n
+    return n
+
+
 def generate(q, lock):
     global framePairCount
+    global Trigger
+    global frameCycle
 
     # Some configuration values
 
@@ -308,7 +320,8 @@ def generate(q, lock):
 
     print("Configuration values :")
     print("Node ", node, "software version", version)
-    print("Trigger:", Trigger)
+    sensitivityChange.value = Trigger
+    print("Trigger:", sensitivityChange.value)
     print("TriggerDelayTime(secs):", sleepDelay)
     print("LookFor:", lifeforms)
     print("Remote hostname", hostname)
@@ -378,8 +391,31 @@ def generate(q, lock):
         if frameCount == 0:  # Only check on this at a slowish rate
             directly_save_image(webcamFile, frame1, lock)
 
+        if frameCount != 0 and 0 == frameCount % frameCycle - 1:
+            #   Assess effectiveness of trigger level
+            powerRatio = detected / (detected + rejected)
+
+            if abs(powerRatio - 1.0) < 0.95:  # Want about 5%
+                sensitivity = -1
+            else:
+                if abs(powerRatio) < 0.01:  # Fewer than 1% show movement
+                    sensitivity = 1
+                else:
+                    sensitivity = 0  # Leave alone
+
+            lowTlimit = 2.0
+            uppTlimit = 3.5
+            divisions = (uppTlimit - lowTlimit) / 100.0
+            Trigger = Trigger - sensitivity * divisions
+            Trigger = clamp(Trigger, lowTlimit, uppTlimit)
+
+            PixelDiffThreshold = 128 * width * height * Trigger / 100
+            sensitivityChange.value = Trigger
+            if debug:
+                print("Trigger value :", Trigger, detected, rejected)
+
         frameCount += 1
-        frameCount = frameCount % 1024
+        frameCount = frameCount % frameCycle
 
         framesBeingProcessed.value += 1  # Update watchdog
 
@@ -417,23 +453,6 @@ def generate(q, lock):
             detected += 1
         else:
             rejected += 1
-
-        #   Assess effectiveness of trigger level
-
-        powerRatio = detected / (detected + rejected)
-
-        initialSensitivity = sensitivity
-
-        if abs(powerRatio - 1.0) < 0.05:  # Almost all frames show movement
-            sensitivity = -1
-        else:
-            if abs(powerRatio) < 0.01:  # Fewer than 1% show movement
-                sensitivity = 1
-            else:
-                sensitivity = 0  # Leave alone
-
-        if initialSensitivity != sensitivity:
-            sensitivityChangeRequest.value = sensitivity
 
         sleep(0.5)
 
@@ -499,8 +518,9 @@ def analyse(q, ib):
     global foundSomeone
     global Trigger
     global perfLog
+    global frameCycle
 
-    debug = False
+    debug =False
 
     if perfLog == "":
         perfLog = jpeg_store + "perfLog_" + filenames.timestampedFilename() + ".txt"
@@ -532,12 +552,12 @@ def analyse(q, ib):
             if debug:
                 print("No lifeforms!!")
 
-        if 1024 <= framesBeingProcessed.value:
+        if frameCycle <= framesBeingProcessed.value:
             try:
                 f = open(perfLog, "a+")
                 f.write(
                     "Trigger level:"
-                    + str(Trigger)
+                    + str(sensitivityChange.value)
                     + "\nFrame pairs:"
                     + str(framesBeingProcessed.value)
                     + " Frames with motion:"
@@ -548,8 +568,7 @@ def analyse(q, ib):
                     + str(q.qsize())
                     + " Frames queued to save:"
                     + str(ib.qsize())
-                    + "\n Sensitivity change suggested:"
-                    + str(sensitivityChangeRequest.value)
+                    + "\n"
                 )
                 print("Performance data written on ", perfLog)
                 framesBeingProcessed.value = 0
@@ -612,7 +631,7 @@ def RunningLow(folder, limit):
         return False
 
     if debug:
-        print("Free: %d GiB" % (free // (2**30)))
+        print("Free: %d GiB" % (free // (2 ** 30)))
 
     if free < limit:
         return True
@@ -718,7 +737,7 @@ def preserve(ib, lock):
 
         frameCount += 1
         frameCount = (
-            frameCount % 1024
+            frameCount % frameCycle
         )  # Make these wrap around so they don't used unbounded levels of storage
 
         lock.release()
