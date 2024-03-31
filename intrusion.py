@@ -390,8 +390,8 @@ def generate(q, lock):
 
         if frameCount == 0:  # Only check on this at a slowish rate
             directly_save_image(webcamFile, frame1, lock)
-
-        if frameCount != 0 and 0 == frameCount % frameCycle - 1:
+#        if frameCount != 0 and 0 == frameCount % (frameCycle - 1):
+        if frameCount != 0 and 0 == frameCount % (512 - 1):
             #   Assess effectiveness of trigger level
             powerRatio = detected / (detected + rejected)
 
@@ -402,18 +402,22 @@ def generate(q, lock):
                     sensitivity = 1
                 else:
                     sensitivity = 0  # Leave alone
-
+            if debug:
+                print("Sensitivity:",sensitivity ," ratio:",powerRatio)
             lowTlimit = 2.0
             uppTlimit = 3.5
-            divisions = (uppTlimit - lowTlimit) / 100.0
+            divisions = (uppTlimit - lowTlimit) / 50.
+            if debug:
+                print("trigger:",Trigger)
             Trigger = Trigger - sensitivity * divisions
             Trigger = clamp(Trigger, lowTlimit, uppTlimit)
+            if debug:
+                print("trigger:",Trigger)
 
             PixelDiffThreshold = 128 * width * height * Trigger / 100
             sensitivityChange.value = Trigger
             if debug:
                 print("Trigger value :", Trigger, detected, rejected)
-
         frameCount += 1
         frameCount = frameCount % frameCycle
 
