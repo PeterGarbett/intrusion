@@ -390,7 +390,7 @@ def generate(q, lock):
 
         if frameCount == 0:  # Only check on this at a slowish rate
             directly_save_image(webcamFile, frame1, lock)
-#        if frameCount != 0 and 0 == frameCount % (frameCycle - 1):
+        #        if frameCount != 0 and 0 == frameCount % (frameCycle - 1):
         if frameCount != 0 and 0 == frameCount % (512 - 1):
             #   Assess effectiveness of trigger level
             powerRatio = detected / (detected + rejected)
@@ -403,16 +403,16 @@ def generate(q, lock):
                 else:
                     sensitivity = 0  # Leave alone
             if debug:
-                print("Sensitivity:",sensitivity ," ratio:",powerRatio)
+                print("Sensitivity:", sensitivity, " ratio:", powerRatio)
             lowTlimit = 2.0
             uppTlimit = 3.5
-            divisions = (uppTlimit - lowTlimit) / 50.
+            divisions = (uppTlimit - lowTlimit) / 50.0
             if debug:
-                print("trigger:",Trigger)
+                print("trigger:", Trigger)
             Trigger = Trigger - sensitivity * divisions
             Trigger = clamp(Trigger, lowTlimit, uppTlimit)
             if debug:
-                print("trigger:",Trigger)
+                print("trigger:", Trigger)
 
             PixelDiffThreshold = 128 * width * height * Trigger / 100
             sensitivityChange.value = Trigger
@@ -493,7 +493,7 @@ def lifeforms_scan(frame):
     # Full list in yolov3.txt
     # What we actually scan for is defined in the config file
 
-    found = set(yolo.yoloImage(frame))
+    found = set(yolo.yolo_image(frame))
     found_lifeforms = found & lifeforms
 
     if debug:
@@ -524,7 +524,7 @@ def analyse(q, ib):
     global perfLog
     global frameCycle
 
-    debug =False
+    debug = False
 
     if perfLog == "":
         perfLog = jpeg_store + "perfLog_" + filenames.timestampedFilename() + ".txt"

@@ -1,4 +1,4 @@
-'''
+"""
 
 #############################################
 # Object detection - YOLO - OpenCV
@@ -12,7 +12,7 @@
 # usage removed and yolo file locations fixed
 # at /etc/opt/yolo/
 
-'''
+"""
 
 import sys
 import argparse
@@ -21,13 +21,13 @@ import numpy as np
 
 
 def start(image_file_name, direct_image, use_direct):
-    '''
+    """
 
     emulates what the software would expect for the command line.
     I've chosen /etc/opt/yolo as a home for the data files. This file
     on /usr/local/bin so I can call it froum anywhere
 
-    '''
+    """
 
     args = argparse.Namespace(
         image=image_file_name,
@@ -66,7 +66,7 @@ def start(image_file_name, direct_image, use_direct):
     scale = 0.00392
     classes = None
 
-    with open(args.classes, "r",encoding='ascii') as class_file:
+    with open(args.classes, "r", encoding="ascii") as class_file:
         classes = [line.strip() for line in class_file.readlines()]
 
     # COLORS = np.random.uniform(0, 255, size=(len(classes), 3))
@@ -79,7 +79,7 @@ def start(image_file_name, direct_image, use_direct):
 
     outs = net.forward(get_output_layers(net))
 
-    #I don't actually uses these boxes at the moment  but they might be useful later
+    # I don't actually uses these boxes at the moment  but they might be useful later
 
     class_ids = []
     confidences = []
@@ -100,7 +100,9 @@ def start(image_file_name, direct_image, use_direct):
                 box_y_coordinate = center_y - box_height / 2
                 class_ids.append(class_id)
                 confidences.append(float(confidence))
-                boxes.append([box_x_coordinate, box_y_coordinate, box_width, box_height])
+                boxes.append(
+                    [box_x_coordinate, box_y_coordinate, box_width, box_height]
+                )
 
     items = list(set(class_ids))
     names = [str(classes[x]) for x in items]
@@ -109,12 +111,12 @@ def start(image_file_name, direct_image, use_direct):
 
 
 def yolo_image(image):
-    ''' Entry point for function to apply yolo to an image returning a list of found items '''
+    """Entry point for function to apply yolo to an image returning a list of found items"""
     items = start(None, image, True)
     return items
 
 
 def yolo_file(filename):
-    ''' Entry point for function to apply yolo to a file returning a list of found items '''
+    """Entry point for function to apply yolo to a file returning a list of found items"""
     items = start(filename, None, False)
     return items
