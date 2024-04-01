@@ -560,7 +560,8 @@ def analyse(q, ib):
             try:
                 f = open(perfLog, "a+")
                 f.write(
-                    "Trigger level:"
+                    datetime.datetime.now()
+                    + "\nTrigger level:"
                     + str(sensitivityChange.value)
                     + "\nFrame pairs:"
                     + str(framesBeingProcessed.value)
