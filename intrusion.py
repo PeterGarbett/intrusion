@@ -443,7 +443,7 @@ def generate(q, lock):
             )
 
         if PixelDiffThreshold < abs(num_diff):
-            timestamp = filenames.timestampedFilename()
+            timestamp = filenames.time_stamped_filename()
             qitem = (frame2, timestamp)
             q.put(qitem)
             directly_save_image(
@@ -527,7 +527,7 @@ def analyse(q, ib):
     debug = False
 
     if perfLog == "":
-        perfLog = jpeg_store + "perfLog_" + filenames.timestampedFilename() + ".txt"
+        perfLog = jpeg_store + "perfLog_" + filenames.time_stamped_filename() + ".txt"
 
     while True:
         yoloAnalysisActive.value += 1
@@ -709,7 +709,7 @@ def preserve(ib, lock):
         timestamp = frameAndStamp[1]
         image = im.fromarray(frame)
 
-        outname = filenames.imageName(
+        outname = filenames.image_name(
             NumberPics, jpeg_store, node, frameCount, timestamp, False
         )
 
@@ -729,7 +729,7 @@ def preserve(ib, lock):
         #   This means we can easily identify what hasn't been sent ...  to retry later
 
         if scp_status:
-            newname = filenames.imageName(
+            newname = filenames.image_name(
                 NumberPics, jpeg_store, node, frameCount, timestamp, True
             )
             os.system("touch " + newname)  # if inotify is watching prod it
@@ -811,7 +811,7 @@ def reTransmit(lock):
         #   If we succeed then rename the file as local... implying it also exists remotely
 
         if scp_status:
-            newname = filenames.addInLocalToFilename(NumberPics, outname, False)
+            newname = filenames.add_in_local_to_filename(NumberPics, outname, False)
 
             if newname != "":
                 os.system("touch " + newname)  # if inotify is watching prod it
