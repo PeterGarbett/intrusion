@@ -101,7 +101,7 @@ retransmissionActive = multiprocessing.Value("i", 0)
 sensitivityChange = multiprocessing.Value("f", 0)
 
 
-import copySSHKeys
+import copy_ssh_keys
 
 #
 # 	Load a few variables from our configuration file
@@ -202,7 +202,7 @@ def configure():
     if sshKeyLoc != "":
         newKeyDir = load_param(exl, "new_ssh_elements:")
         if newKeyDir != None:
-            copySSHKeys.update_keys(newKeyDir, sshKeyLoc)
+            copy_ssh_keys.update_keys(newKeyDir, sshKeyLoc)
 
     #
     #   Not a lot of error checking for this one...

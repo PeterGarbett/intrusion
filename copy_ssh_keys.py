@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+"""
 
 # We need  a method to establish connections with other boxes without
 # fiddling around with the command line.  I can do this I think if I
@@ -6,17 +6,20 @@
 # and read from on startup.  I try not to remove exising keys to avoid
 # inadvertantly losing comms with the machine.
 
+"""
+
 import os
 import shutil
 
 
-def update_keys(keyFileLoc, sshKeys):
+def update_keys(key_file_lock, ssh_keys):
+    """look in directory to ee if we have new keys"""
 
-    #   look in directory holding new keys
+    #   Exceptions here aren't errors so aren't enunciated
 
     try:
-        list_of_files = os.listdir(keyFileLoc)
-    except Exception as e:
+        list_of_files = os.listdir(key_file_lock)
+    except:  # File or directory not found... cant' read it
         list_of_files = []
 
     # No candidates for new keys so finished
@@ -25,8 +28,8 @@ def update_keys(keyFileLoc, sshKeys):
         return
 
     try:
-        list_of_filesDest = os.listdir(sshKeys)
-    except Exception as e:
+        list_of_files_dest = os.listdir(ssh_keys)
+    except:
         #   SSH key directory doesn't exist so finished.
         return
 
@@ -38,21 +41,23 @@ def update_keys(keyFileLoc, sshKeys):
     # list
 
     try:
-        auPos = list_of_filesDest.index("authorized_keys")
-        list_of_filesDest.remove("authorized_keys")
+        list_of_files_dest.index("authorized_keys")
+        list_of_files_dest.remove("authorized_keys")
     except:
         pass  # not there, so dont worry
 
     try:
-        knownHPos = list_of_filesDest.index("known_hosts")
-        list_of_filesDest.remove("known_hosts")
+        list_of_files_dest.index("known_hosts")
+        list_of_files_dest.remove("known_hosts")
     except:
         pass  # not there, so dont worry
 
-    copyList = [x for x in list_of_files if x not in list_of_filesDest]
+    copy_list = [x for x in list_of_files if x not in list_of_files_dest]
 
-    if len(copyList) == 0:  # 	Nothing to copy so finished
+    if len(copy_list) == 0:  # 	Nothing to copy so finished
         return
-    else:
-        for source in copyList:
-            shutil.copy(keyFileLoc + source, sshKeys + source)
+
+    # Actually do the file copying
+
+    for source in copy_list:
+        shutil.copy(key_file_lock + source, ssh_keys + source)
