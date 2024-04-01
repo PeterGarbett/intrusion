@@ -1,14 +1,11 @@
-#!/usr/bin/python3
-#
-#
-#
+""" produce time stamp string for use in file naming """
 
+import os
 import datetime
 
-# produce time stamp string for use in file naming
 
-
-def timestampedFilename():
+def time_stamped_filename():
+    """Generate string suitable for part of a filename from the current time"""
     presentday = datetime.datetime.now()
 
     name = str(presentday)
@@ -28,14 +25,14 @@ def timestampedFilename():
 # but overwrites on every restart
 
 
-def imageName(numberPics, dirname, node, count, timestamp, local):
-
+def image_name(number_pics, dirname, node, count, timestamp, local):
+    """Form image name using timestamp or a count"""
     debug = False
 
     if debug:
         print(
             "imagename input: numberpics: ",
-            numberPics,
+            number_pics,
             "dir:",
             dirname,
             "node:",
@@ -53,12 +50,12 @@ def imageName(numberPics, dirname, node, count, timestamp, local):
     else:
         here = ""
 
-    if numberPics:
-        outnameStart = dirname + str(count)
+    if number_pics:
+        outname_start = dirname + str(count)
     else:
-        outnameStart = dirname + timestamp
+        outname_start = dirname + timestamp
 
-    outname = outnameStart + "_lb" + str(node) + here + ".jpg"
+    outname = outname_start + "_lb" + str(node) + here + ".jpg"
 
     return outname
 
@@ -68,11 +65,8 @@ def imageName(numberPics, dirname, node, count, timestamp, local):
 # need to change it.
 
 
-import os
-
-
-def addInLocalToFilename(numberPics, name, returnIdent):
-
+def add_in_local_to_filename(number_pics, name, return_ident):
+    """Modify the filename by adding in local to signify its been sent offsite"""
     debug = False
 
     if debug:
@@ -82,26 +76,26 @@ def addInLocalToFilename(numberPics, name, returnIdent):
 
     base, fname = os.path.split(filename)
     base = base + "/"
-    nameList = fname
-    MandNode = fname.split("_")[-1]
+    name_list = fname
+    m_and_node = fname.split("_")[-1]
 
     if debug:
-        print("Machine Node", MandNode)
+        print("Machine Node", m_and_node)
 
     #   Should be an 'm' followed by at least one digit
 
-    if len(MandNode) < 2:
+    if len(m_and_node) < 2:
         return ""
 
     #   Leading with 'lb'
 
-    if MandNode[0] != "l":
+    if m_and_node[0] != "l":
         return ""
 
-    if MandNode[1] != "b":
+    if m_and_node[1] != "b":
         return ""
 
-    nodestr = MandNode[2:]
+    nodestr = m_and_node[2:]
 
     if debug:
         print("Node:", nodestr)
@@ -111,46 +105,46 @@ def addInLocalToFilename(numberPics, name, returnIdent):
     except:
         return ""
 
-    if len(nameList) < 3:
+    if len(name_list) < 3:
         return ""
-    else:
-        stamp = nameList.replace("_" + MandNode, "")
+
+    stamp = name_list.replace("_" + m_and_node, "")
 
     #   Stamp is either count or time separted by underscores
-    #   depending on numberPics
+    #   depending on number_pics
 
     if debug:
-        print("machine and node:", MandNode)
+        print("machine and node:", m_and_node)
         print("stamp:", stamp)
 
-    picIdent = stamp.replace(MandNode, "")
-    picIdent = picIdent.replace("local", "")
-    picIdent = picIdent.rstrip("_")
+    pic_ident = stamp.replace(m_and_node, "")
+    pic_ident = pic_ident.replace("local", "")
+    pic_ident = pic_ident.rstrip("_")
 
     if debug:
-        print("picture ident:", picIdent)
+        print("picture ident:", pic_ident)
 
     # If we remove the underscores we should be left with only digits
 
-    if not picIdent.replace("_", "").isnumeric():
+    if not pic_ident.replace("_", "").isnumeric():
         return ""
 
-    if returnIdent:
-        return picIdent
+    if return_ident:
+        return pic_ident
 
-    newname = imageName(numberPics, base, node, picIdent, picIdent, True)
+    newname = image_name(number_pics, base, node, pic_ident, pic_ident, True)
 
     return newname
 
 
-import datetime
+def txt_timestamp_to_time(timestamp):
+    """
 
+    Convert someting of the form
+     2024_03_06_14_24_21_423461
+     to datetime object
 
-def txtTimestampToTime(timestamp):
-
-    # Convert someting of the form
-    # 2024_03_06_14_24_21_423461
-    # to datetime object
+    """
 
     timestamp = timestamp.replace("_", "-", 2)
     timestamp = timestamp.replace("_", " ", 1)
@@ -162,30 +156,13 @@ def txtTimestampToTime(timestamp):
     # really poor.
 
     try:
-        stampNoMs = timestamp[:-7]
-        MicrosecondsTXT = timestamp.split(".")[1]
-        Microseconds = int(MicrosecondsTXT)
-        when = datetime.datetime.strptime(stampNoMs, "%Y-%m-%d %H:%M:%S")
-        when = when.replace(microsecond=Microseconds)
-    except Exception as e:
+        stamp_noms = timestamp[:-7]
+        microseconds_text = timestamp.split(".")[1]
+        microseconds = int(microseconds_text)
+        when = datetime.datetime.strptime(stamp_noms, "%Y-%m-%d %H:%M:%S")
+        when = when.replace(microsecond=microseconds)
+    except Exception as err:
         when = 0
-        print("Incorrect date format", e)
+        print("Incorrect date format", err)
 
     return when
-
-
-def main():
-
-    filename = "/home/peter/2024_03_06_14_24_21_423461_lb42.jpg"
-    print("Old name:", filename)
-    new = addInLocalToFilename(False, filename, False)
-    print("newname:", new)
-    filename = "/home/peter/123456789_lb21.jpg"
-    print("Old name:", filename)
-    new = addInLocalToFilename(True, filename, False)
-    print("newname:", new)
-
-
-
-if __name__ == "__main__":
-    main()
