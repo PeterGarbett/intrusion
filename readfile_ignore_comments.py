@@ -1,17 +1,18 @@
-#
-#   Code for reading file ignoring anything following an octothorp
-#   and any trailing whitespace after its removal
-#
+'''
 
+   Code for reading file ignoring anything following an octothorp
+   and any trailing whitespace after its removal
 
-def stripString(commented_line, changeCase):
+'''
 
+def strip_string(commented_line, change_case):
+    ''' Allow trailing comments by removing them, and optionally change case '''
     #   Parse option to change case
 
-    if changeCase == -1:
+    if change_case == -1:
         commented_line = commented_line.lower()
     else:
-        if changeCase == 1:
+        if change_case == 1:
             commented_line = commented_line.upper()
 
     # Only interested in the first item delimited by a #
@@ -27,13 +28,13 @@ def stripString(commented_line, changeCase):
 #
 
 
-def readfile_ignore_comments(diskname, changeCase):
-
+def readfile_ignore_comments(diskname, change_case):
+    ''' Read file and trim newlines 'nd trailing comments '''
     try:
         #   read list of words to exclude
-        with open(diskname) as g:
-            exclude = g.readlines()
-            g.close()
+        with open(diskname,encoding='ascii') as parameter_file:
+            exclude = parameter_file.readlines()
+            parameter_file.close()
 
             # Remove all the pesky \n's
 
@@ -41,8 +42,15 @@ def readfile_ignore_comments(diskname, changeCase):
 
             # Make list case independent
 
-            for pos in range(len(exclude)):
-                exclude[pos] = stripString(exclude[pos], changeCase)
+#            for pos in range(len(exclude)):
+#                exclude[pos] = strip_string(exclude[pos], change_case)
+
+            print(exclude)
+
+            for item in exclude:
+                item = strip_string(item,change_case)
+
+
 
             # If theres now no string left, ignore it
             exclude = list(filter(None, exclude))
