@@ -29,36 +29,28 @@ def strip_string(commented_line, change_case):
 
 
 def readfile_ignore_comments(diskname, change_case):
-    ''' Read file and trim newlines 'nd trailing comments '''
+    ''' Read file and trim newlines and trailing comments '''
     try:
         #   read list of words to exclude
         with open(diskname,encoding='ascii') as parameter_file:
             exclude = parameter_file.readlines()
             parameter_file.close()
+    except FileNotFoundError:
+        return []
 
             # Remove all the pesky \n's
+    try:
 
-            exclude = [x.replace("\n", "") for x in exclude]
+        exclude = [x.replace("\n", "") for x in exclude]
 
             # Make list case independent
 
-#            for pos in range(len(exclude)):
-#                exclude[pos] = strip_string(exclude[pos], change_case)
-
-            print(exclude)
-
-            for item in exclude:
-                item = strip_string(item,change_case)
-
-
+        exclude  = [strip_string(x,change_case) for x in exclude]
 
             # If theres now no string left, ignore it
-            exclude = list(filter(None, exclude))
+        exclude = list(filter(None, exclude))
 
-            return exclude
-
-    except FileNotFoundError:
-        return []
+        return exclude
 
     except Exception as err:
         print(err)
