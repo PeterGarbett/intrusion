@@ -1,3 +1,5 @@
+"""
+
 #
 # 	Intrusion detection
 #
@@ -47,13 +49,36 @@
 # 	Some of these parameters therefore have to be global but the
 # 	ammount they are shared is actually minimal
 
+"""
 
-import numpy as np
-import cv2 as cv
 import multiprocessing
-from multiprocessing import Process, Queue, Value
+from multiprocessing import Process
+from multiprocessing import Queue
+from multiprocessing import Value
+from multiprocessing import Pool
+from multiprocessing import active_children
 import queue
 from time import sleep
+import datetime
+
+import sys
+import shutil
+import glob
+import os
+import signal
+
+import cv2 as cv
+import numpy as np
+import paramiko
+from paramiko import SSHClient
+from PIL import Image as im
+from scp import SCPClient
+
+import copy_ssh_keys
+import yolo
+import readfile_ignore_comments
+import filenames
+
 
 node = 1
 version = 1.0
@@ -99,9 +124,6 @@ yoloAnalysisActive = multiprocessing.Value("i", 0)
 filestoreActive = multiprocessing.Value("i", 0)
 retransmissionActive = multiprocessing.Value("i", 0)
 sensitivityChange = multiprocessing.Value("f", 0)
-
-
-import copy_ssh_keys
 
 #
 # 	Load a few variables from our configuration file
@@ -152,7 +174,7 @@ def configure():
         print(
             "No configuration file found,need", trial_location, " or ", trial_location2
         )
-        exit()
+        sys.exit()
     else:
         print("Using configuration file ", config_found)
 
@@ -186,7 +208,7 @@ def configure():
         Trigger = float(triggerStr)
     except:
         print("Illegal value for trigger", triggerStr)
-        exit()
+        sys.exit()
 
     sleepDelayTxt = load_param(exl, "triggerdelay:")
 
@@ -220,7 +242,7 @@ def configure():
         os.listdir(jpeg_store)
     except:
         print("Directory", jpeg_store, "not found")
-        exit()
+        sys.exit()
 
     debug = False
 
@@ -244,7 +266,6 @@ def configure():
 #   difference consequtive images and sum the pixel values
 #   see if this exceeds a threshold
 
-import datetime
 
 # Set initial time to expire timer immediatly
 
@@ -285,9 +306,6 @@ def directly_save_image(webcamFile, frame, lock):
 
             live_image_time_saved = datetime.datetime.now()
         lock.release()
-
-
-import sys
 
 
 # Clamp a value between limits
@@ -351,7 +369,7 @@ def generate(q, lock):
     cap = cv.VideoCapture(0)
     if not cap.isOpened():
         print("Cannot open camera")
-        exit()
+        sys.exit()
 
     cap.set(3, width)
     cap.set(4, height)
@@ -464,13 +482,11 @@ def generate(q, lock):
 
     cap.release()
 
-    exit(0)
+    sys.exit(0)
 
 
 # Define a function that will run in a separate process
 
-import yolo
-import sys
 
 #
 # Some of these are rather unlikely
@@ -588,12 +604,6 @@ def analyse(q, ib):
 # This could be anywhere on the internet
 
 
-from PIL import Image as im
-import paramiko
-from paramiko import SSHClient
-from scp import SCPClient
-
-
 def send_file(filename):
     debug = False
 
@@ -616,15 +626,9 @@ def send_file(filename):
     return sent
 
 
-import datetime
-
-
 # See if we are running out of local storage
 # and delete a few oldest files if so
 # This is to avoid a problem on unattended infrequently managed systems
-
-import os
-import shutil
 
 
 def RunningLow(folder, limit):
@@ -687,8 +691,6 @@ def make_space(folder, limit):
 
 # Stage 3 of our image pipeline. We have something worth saving
 # so set about keeping it.
-
-import filenames
 
 
 def preserve(ib, lock):
@@ -755,10 +757,6 @@ def preserve(ib, lock):
 # I assumme here we aren't sending data out to a machine on the LAN
 # the main case of interest is lost internet, so we test for it
 # working 1st
-
-
-import glob
-import os
 
 
 def reTransmit(lock):
@@ -828,29 +826,22 @@ def reTransmit(lock):
 #   And now the multitasking bit....
 #
 
-import signal, os
-from multiprocessing import Pool
-from multiprocessing import active_children
-
 # Attempt orderly shutdown
 
 
 def handler(signum, frame):
+    ''' Catch termination signal so we can kill our children... yes really '''
     signame = signal.Signals(signum).name
     print("Caught signal", signame)
 
     for p in multiprocessing.active_children():
         p.terminate()
 
-    exit()
+    sys.exit()
 
-
-import multiprocessing
 
 fileLock = multiprocessing.Lock()
 
-
-import readfile_ignore_comments
 
 # 	Routines used to parse configuration file
 
@@ -866,6 +857,7 @@ def load_param(exl, parameter):
     index = find_element_substring(exl, parameter)
     if index == -1:
         print(parameter, "not defined in config file")
+        sys.exit()
     else:
         filestr = exl[index]
         filestr = filestr.split(":")
@@ -940,7 +932,8 @@ def main():
 
     framesBeingProcessed.value = 0
 
-    #        print(parentPID,P1PID,P2PID,P3PID,P4PID)
+    if debug:
+        print(parentPID, P1PID, P2PID, P3PID, P4PID)
 
     while True:
         # Check children are all (nominally) active
@@ -955,7 +948,7 @@ def main():
             for p in multiprocessing.active_children():
                 print("Active child:", p)
                 p.terminate()
-            exit()
+            sys.exit()
 
         # Inspect a pulse for each process
 
@@ -995,4 +988,5 @@ def main():
 
 
 if __name__ == "__main__":
+    ''' Routine entry point '''
     main()
