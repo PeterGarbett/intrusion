@@ -124,8 +124,10 @@ framesBeingProcessed = multiprocessing.Value("i", 0)
 yoloAnalysisActive = multiprocessing.Value("i", 0)
 filestoreActive = multiprocessing.Value("i", 0)
 retransmissionActive = multiprocessing.Value("i", 0)
-sensitivityChange = multiprocessing.Value("f", 0)
 
+sensitivityChange = multiprocessing.Value("f", 0)
+sensitivity_upper = multiprocessing.Value("f", 0)
+sensitivity_lower = multiprocessing.Value("f", 0)
 #
 # 	Load a few variables from our configuration file
 #
@@ -202,13 +204,32 @@ def configure():
             print("Illegal timestamp selection - defaulting to timestamping")
             number_pictures = False
 
-    trigger_string = load_param(exl, "motion_trigger_level:")
+    trigger_string = load_param(exl, "motion_trigger_initial:")
 
     try:
         sensitivityChange.value = float(trigger_string)
     except:
         print("Illegal value for trigger", trigger_string)
         sys.exit()
+
+    trigger_string = load_param(exl, "motion_trigger_upper:")
+
+    try:
+        sensitivity_upper.value = float(trigger_string)
+    except:
+        print("Illegal value for trigger upper bound", trigger_string)
+        sys.exit()
+
+    trigger_string = load_param(exl, "motion_trigger_lower:")
+
+    try:
+        sensitivity_lower.value = float(trigger_string)
+    except:
+        print("Illegal value for trigger lower bound ", trigger_string)
+        sys.exit()
+
+
+
 
     sleep_delay_text = load_param(exl, "triggerdelay:")
 
@@ -335,7 +356,6 @@ def generate(yolo_process_q, lock):
 
     print("Configuration values :")
     print("Node ", node, "software version", version)
-    print("Trigger:", sensitivityChange.value)
     print("TriggerDelayTime(secs):", sleepDelay)
     print("LookFor:", lifeforms)
     print("Remote hostname", hostname)
@@ -346,6 +366,9 @@ def generate(yolo_process_q, lock):
     print("Use timestamps:", not number_pictures)
     print("New .ssh directory contents:", newKeyDir)
     print(".ssh directory :", sshKeyLoc)
+    print("Trigger initial value:", sensitivityChange.value)
+    print("Trigger upper bound:", sensitivity_upper.value)
+    print("Trigger lower bound:", sensitivity_lower.value)
 
     sys.stdout.flush()  # Make sure we see the above immediatly in the systemd log
 
@@ -357,6 +380,11 @@ def generate(yolo_process_q, lock):
     #   Changed to be changed pixels. hopefully less dependent on brightness
 
     pixel_diff_threshold = 128 * width * height * sensitivityChange.value / 100
+
+    upper_trigger_limit = sensitivity_upper.value
+    lower_trigger_limit = sensitivity_lower.value
+
+    divisions = (upper_trigger_limit - lower_trigger_limit) / 50.0
 
     #   Setup video capture
     #   the 0 lets opencv figure it out which it does nicely when there
@@ -374,6 +402,8 @@ def generate(yolo_process_q, lock):
     frame_count = 0
     detected = 0
     rejected = 0
+
+
 
     # video frame capture loop
 
@@ -415,9 +445,6 @@ def generate(yolo_process_q, lock):
                     sensitivity = 0  # Leave alone
             if debug:
                 print("Sensitivity:", sensitivity, " ratio:", power_ratio)
-            lower_trigger_limit = 2.0
-            upper_trigger_limit = 3.5
-            divisions = (upper_trigger_limit - lower_trigger_limit) / 50.0
 
             trigger = sensitivityChange.value
             if debug:
