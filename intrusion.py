@@ -13,7 +13,7 @@
 #   Multiple tasks used, 3 main in image pipeline
 #   This enables access to multiple cores.
 #
-# 		 q          ib
+# 		 q          file_save_q
 # 	generate -> analyse -> preserve
 #
 # 	Generate
@@ -27,10 +27,10 @@
 # 	preserve
 # 	saves file to filesystem and attempts transfer via scp
 # 	manages space if we are running out by deleting oldest files
-# 	renames file to local_ if transfer suceeeds. It should be possible
+# 	renames file to local_ if transfer suceeeds. It should be possfile_save_qle
 #   to daisy chain several devices together.
 #
-# 	reTransmit
+# 	re_transmit
 # 	Try to send file again and rename with prefix 'local_' on success.
 #
 # 	Last two processes share access using a filesystem lock
@@ -102,7 +102,7 @@ path = ""
 
 Trigger = 5  # Roughly, the percentage change that triggers a snapshot
 sleepDelay = 1.0  # Time to look away after a motion detect to avoid overloads
-frameCycle = 1024
+frame_cycle = 1024
 
 # Avoid generating massive queues
 
@@ -113,7 +113,7 @@ frameDelay = 3
 
 window = 0.25  # analysis polling rate limiter
 window2 = 0.1  # filestore management polling rate limiter
-window3 = 60  # reTransmit polling rate
+window3 = 60  # re_transmit polling rate
 
 #
 #   Watchdog variables for sub-processes
@@ -319,7 +319,7 @@ def clamp(n, minn, maxn):
 def generate(q, lock):
     global framePairCount
     global Trigger
-    global frameCycle
+    global frame_cycle
 
     # Some configuration values
 
@@ -377,8 +377,7 @@ def generate(q, lock):
 
     #   Setup first pass flag
 
-    First = True
-    frameCount = 0
+    frame_count = 0
     detected = 0
     rejected = 0
 
@@ -406,22 +405,22 @@ def generate(q, lock):
             cap.release()
             break  # Result in child terminating and tripping of watchdog
 
-        if frameCount == 0:  # Only check on this at a slowish rate
+        if frame_count == 0:  # Only check on this at a slowish rate
             directly_save_image(webcamFile, frame1, lock)
-        #        if frameCount != 0 and 0 == frameCount % (frameCycle - 1):
-        if frameCount != 0 and 0 == frameCount % (512 - 1):
+        #        if frame_count != 0 and 0 == frame_count % (frame_cycle - 1):
+        if frame_count != 0 and 0 == frame_count % (512 - 1):
             #   Assess effectiveness of trigger level
-            powerRatio = detected / (detected + rejected)
+            power_ratio = detected / (detected + rejected)
 
-            if abs(powerRatio - 1.0) < 0.95:  # Want about 5%
+            if abs(power_ratio - 1.0) < 0.95:  # Want about 5%
                 sensitivity = -1
             else:
-                if abs(powerRatio) < 0.01:  # Fewer than 1% show movement
+                if abs(power_ratio) < 0.01:  # Fewer than 1% show movement
                     sensitivity = 1
                 else:
                     sensitivity = 0  # Leave alone
             if debug:
-                print("Sensitivity:", sensitivity, " ratio:", powerRatio)
+                print("Sensitivity:", sensitivity, " ratio:", power_ratio)
             lowTlimit = 2.0
             uppTlimit = 3.5
             divisions = (uppTlimit - lowTlimit) / 50.0
@@ -436,8 +435,8 @@ def generate(q, lock):
             sensitivityChange.value = Trigger
             if debug:
                 print("Trigger value :", Trigger, detected, rejected)
-        frameCount += 1
-        frameCount = frameCount % frameCycle
+        frame_count += 1
+        frame_count = frame_count % frame_cycle
 
         framesBeingProcessed.value += 1  # Update watchdog
 
@@ -468,7 +467,7 @@ def generate(q, lock):
                 webcamFile, frame2, lock
             )  # Keep live image recent when changes occur
             if debug:
-                print("Motion detected, pushed frame", frameCount)
+                print("Motion detected, pushed frame", frame_count)
             sleep(sleepDelay)
             while frameLimit < q.qsize():
                 sleep(frameDelay)  # Prevent system overload
@@ -492,7 +491,7 @@ def generate(q, lock):
 # Some of these are rather unlikely
 # given where we live
 #
-# possible lifeforms yolo will detect are:
+# possfile_save_qle lifeforms yolo will detect are:
 #    {"person","bear","bird","cat", "cow","dog","elephant","giraffe", "horse", "sheep","zebra",}
 #
 # You can also put car or truck in here...
@@ -524,7 +523,7 @@ def lifeforms_scan(frame):
 
 # get image from queue 'q'
 # Analyse image using yolo
-# If its interesting put it on queue 'ib'
+# If its interesting put it on queue 'file_save_q'
 
 rejects = 0
 foundSomeone = 0
@@ -533,12 +532,12 @@ foundSomeone = 0
 perfLog = ""
 
 
-def analyse(q, ib):
+def analyse(q, file_save_q):
     global rejects
     global foundSomeone
     global Trigger
     global perfLog
-    global frameCycle
+    global frame_cycle
 
     debug = False
 
@@ -549,12 +548,12 @@ def analyse(q, ib):
         yoloAnalysisActive.value += 1
 
         try:
-            frameAndStamp = q.get_nowait()
+            frame_and_stamp = q.get_nowait()
         except queue.Empty:
             sleep(window)
             continue
 
-        item = frameAndStamp[0]
+        item = frame_and_stamp[0]
 
         if debug:
             print("analyse image")
@@ -563,7 +562,7 @@ def analyse(q, ib):
         #   if we don't have too
 
         if lifeforms_scan(item):
-            ib.put(frameAndStamp)
+            file_save_q.put(frame_and_stamp)
             foundSomeone += 1
             if debug:
                 print("Lifeforms exist!")
@@ -572,7 +571,7 @@ def analyse(q, ib):
             if debug:
                 print("No lifeforms!!")
 
-        if frameCycle <= framesBeingProcessed.value:
+        if frame_cycle <= framesBeingProcessed.value:
             try:
                 f = open(perfLog, "a+")
                 f.write(
@@ -588,7 +587,7 @@ def analyse(q, ib):
                     + "\nFrames queued to analyse "
                     + str(q.qsize())
                     + " Frames queued to save:"
-                    + str(ib.qsize())
+                    + str(file_save_q.qsize())
                     + "\n"
                 )
                 print("Performance data written on ", perfLog)
@@ -596,8 +595,8 @@ def analyse(q, ib):
                 rejects = 0
                 foundSomeone = 0
                 f.close()
-            except Exception as e:
-                print(e)
+            except Exception as err:
+                print(err)
 
 
 # Send image to somewhere non-local using scp
@@ -617,9 +616,9 @@ def send_file(filename):
         client.connect(hostname, username=user)
         with SCPClient(client.get_transport()) as scp:
             scp.put(filename, remote_path=path)
-    except Exception as e:
+    except Exception as err:
         if debug:
-            print("Failed to save file to remote", e)
+            print("Failed to save file to remote", err)
         sent = False
         pass
 
@@ -631,7 +630,7 @@ def send_file(filename):
 # This is to avoid a problem on unattended infrequently managed systems
 
 
-def RunningLow(folder, limit):
+def running_low(folder, limit):
     debug = False
 
     try:
@@ -660,8 +659,8 @@ def delete_oldest(folder):
 
     try:
         os.chdir(os.path.join(os.getcwd(), folder))
-    except Exception as e:
-        print(e)
+    except Exception as err:
+        print(err)
         return
 
     list_of_files = os.listdir(".")
@@ -676,13 +675,13 @@ def delete_oldest(folder):
     if not SuppressDeletion:
         try:
             os.remove(os.path.abspath(folder + oldest_file))
-        except Exception as e:
-            print(e)
+        except Exception as err:
+            print(err)
             return
 
 
 def make_space(folder, limit):
-    space_low = RunningLow(folder, limit)
+    space_low = running_low(folder, limit)
     if space_low:  # delete a few, releasing lock in between
         delete_oldest(folder)
         delete_oldest(folder)
@@ -693,26 +692,26 @@ def make_space(folder, limit):
 # so set about keeping it.
 
 
-def preserve(ib, lock):
+def preserve(file_save_q, lock):
     debug = False
 
-    frameCount = 0
+    frame_count = 0
 
     while True:
         filestoreActive.value += 1
 
         try:
-            frameAndStamp = ib.get_nowait()
+            frame_and_stamp = file_save_q.get_nowait()
         except queue.Empty:
             sleep(window2)
             continue
 
-        frame = cv.cvtColor(frameAndStamp[0], cv.COLOR_BGR2RGB)
-        timestamp = frameAndStamp[1]
+        frame = cv.cvtColor(frame_and_stamp[0], cv.COLOR_BGR2RGB)
+        timestamp = frame_and_stamp[1]
         image = im.fromarray(frame)
 
         outname = filenames.image_name(
-            NumberPics, jpeg_store, node, frameCount, timestamp, False
+            NumberPics, jpeg_store, node, frame_count, timestamp, False
         )
 
         if debug:
@@ -732,7 +731,7 @@ def preserve(ib, lock):
 
         if scp_status:
             newname = filenames.image_name(
-                NumberPics, jpeg_store, node, frameCount, timestamp, True
+                NumberPics, jpeg_store, node, frame_count, timestamp, True
             )
             os.system("touch " + newname)  # if inotify is watching prod it
             os.rename(outname, newname)
@@ -742,15 +741,15 @@ def preserve(ib, lock):
             if debug:
                 print("file failed to copy to remote")
 
-        frameCount += 1
-        frameCount = (
-            frameCount % frameCycle
+        frame_count += 1
+        frame_count = (
+            frame_count % frame_cycle
         )  # Make these wrap around so they don't used unbounded levels of storage
 
         lock.release()
 
 
-# reTransmit - which is in fact a misnomer it's more like retry
+# re_transmit - which is in fact a misnomer it's more like retry
 # transferring something that didn't go the first time.
 # This is intended to be a background task and would come into play
 # if the connection to the remote machine went down transiently
@@ -759,7 +758,7 @@ def preserve(ib, lock):
 # working 1st
 
 
-def reTransmit(lock):
+def re_transmit(lock):
     debug = False
 
     while True:
@@ -798,11 +797,10 @@ def reTransmit(lock):
         if 0 == len(candidates):
             lock.release()
             continue
-        else:
-            outname = candidates[0]
+        outname = candidates[0]
 
-        if True:
-            print("reTransmit:", outname)
+        if debug:
+            print("re_transmit:", outname)
 
         scp_status = send_file(outname)
 
@@ -834,8 +832,8 @@ def handler(signum, frame):
     signame = signal.Signals(signum).name
     print("Caught signal", signame)
 
-    for p in multiprocessing.active_children():
-        p.terminate()
+    for process in multiprocessing.active_children():
+        process.terminate()
 
     sys.exit()
 
@@ -847,9 +845,9 @@ fileLock = multiprocessing.Lock()
 
 
 def find_element_substring(items, subst):
-    for i in range(len(items)):
-        if subst in items[i]:
-            return i
+    for index in range(len(items)):
+        if subst in items[index]:
+            return index
     return -1
 
 
@@ -876,83 +874,81 @@ def main():
     debug = False
 
     parent = multiprocessing.parent_process()
-    parentPID = 0  # parent.pid
+    parent_pid = 0  # parent.pid
 
-    expectedChildren = 4
+    expected_children = 4
 
     # The following code sets up the queues and processes and starts them
     #
     # we have three processes connectd by two queues namely
-    # generate->q->analyse->ib->preserve  and a reTransmit background task
+    # generate->q->analyse->file_save_q->preserve  and a re_transmit background task
     # which  shares a filesystem lock with preserve
 
     # Create an instance of the Queue class
 
-    q = Queue()
-    ib = Queue()
+    yolo_process_q  = Queue()
+    file_save_q = Queue()
 
     # Create instances of the Process class, one for each function
 
-    p1 = Process(name="MotionDetect", target=generate, args=(q, fileLock))
+    process_1 = Process(name="MotionDetect", target=generate, args=(yolo_process_q, fileLock))
 
-    p2 = Process(
+    process_2 = Process(
         name="yoloFilter",
         target=analyse,
         args=(
-            q,
-            ib,
+            yolo_process_q,
+            file_save_q,
         ),
     )
 
-    p3 = Process(
+    process_3 = Process(
         name="fileStore",
         target=preserve,
         args=(
-            ib,
+            file_save_q,
             fileLock,
         ),
     )
 
-    p4 = Process(name="remoteCopy", target=reTransmit, args=(fileLock,))
+    process_4 = Process(name="remoteCopy", target=re_transmit, args=(fileLock,))
 
     # Start processes
-    p1.start()
-    p2.start()
-    p3.start()
-    p4.start()
+
+    process_1.start()
+    process_2.start()
+    process_3.start()
+    process_4.start()
 
     signal.signal(signal.SIGTERM, handler)
 
-    #   Watchdog
+    if debug:
+        print("PIDs",parent_pid, process_1.pid,process_2.pid,process_3.pid,process_4.pid)
 
-    P1PID = p1.pid
-    P2PID = p2.pid
-    P3PID = p3.pid
-    P4PID = p4.pid
+    #   Watchdog
 
     framesBeingProcessed.value = 0
 
-    if debug:
-        print(parentPID, P1PID, P2PID, P3PID, P4PID)
 
     while True:
+
         # Check children are all (nominally) active
 
-        childCount = 0
-        for p in multiprocessing.active_children():
-            childCount += 1
+        child_count = 0
+        for process in multiprocessing.active_children():
+            child_count += 1
         if debug:
-            print("Active children", childCount)
-        if childCount < expectedChildren:
+            print("Active children", child_count)
+        if child_count < expected_children:
             print("A Child has gone missing")
-            for p in multiprocessing.active_children():
-                print("Active child:", p)
-                p.terminate()
+            for process in multiprocessing.active_children():
+                print("Active child:", process)
+                process.terminate()
             sys.exit()
 
         # Inspect a pulse for each process
 
-        savedFrameCount = framesBeingProcessed.value
+        saved_frame_count = framesBeingProcessed.value
         yoloAnalysisActive.value = 0
         filestoreActive.value = 0
         retransmissionActive.value = 0  # Check this at a slower rate
@@ -970,7 +966,7 @@ def main():
             )  # Check this at a slower rate
 
         if (
-            framesBeingProcessed.value == savedFrameCount
+            framesBeingProcessed.value == saved_frame_count
             or yoloAnalysisActive.value == 0
             or filestoreActive.value == 0
             or retransmissionActive.value == 0
@@ -981,8 +977,8 @@ def main():
             print("loop count for filestore handling:", filestoreActive.value)
             print("loop count for reTramission activity:", retransmissionActive.value)
 
-            for p in multiprocessing.active_children():
-                p.terminate()
+            for process in multiprocessing.active_children():
+                process.terminate()
 
     #   These processes never terminate under normal operation
 
