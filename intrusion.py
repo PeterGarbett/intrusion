@@ -94,7 +94,7 @@ jpeg_store = ""
 
 SuppressDeletion = False  # True     # Dry run for test purposes
 LocalSizeLimit = 1 * 2 ** 30  # bytes required free
-NumberPics = False  # Good for debugging, as an alternative to timestamps
+number_pictures = False  # Good for debugging, as an alternative to timestamps
 
 # Remote filestore
 
@@ -102,7 +102,6 @@ user = ""
 hostname = ""
 path = ""
 
-Trigger = 5  # Roughly, the percentage change that triggers a snapshot
 sleepDelay = 1.0  # Time to look away after a motion detect to avoid overloads
 FRAME_CYCLE = 1024
 
@@ -142,9 +141,8 @@ def configure():
     global hostname
     global path
     global jpeg_store
-    global Trigger
     global sleepDelay
-    global numberPics
+    global number_pictures
     global high_def
     global newKeyDir
     global sshKeyLoc
@@ -165,11 +163,11 @@ def configure():
     trial_location2 = config_location2 + config_filename
 
     exl = readfile_ignore_comments.readfile_ignore_comments(trial_location, 0)
-    if [] != exl:
+    if exl:
         config_found = trial_location
     else:
         exl = readfile_ignore_comments.readfile_ignore_comments(trial_location2, 0)
-        if [] != exl:
+        if exl:
             config_found = trial_location2
 
     if config_found == "":
@@ -184,40 +182,40 @@ def configure():
     hostname = hostname + load_param(exl, "remote_url:")
     path = path + load_param(exl, "remote_path:")
 
-    hd = load_param(exl, "high_def:")
-    if hd == "true":
+    high_def_bool_txt = load_param(exl, "high_def:")
+    if high_def_bool_txt == "true":
         high_def = True
     else:
         high_def = False
-        if hd != "false":
+        if high_def_bool_txt != "false":
             print("Bad selection value for high definition: assummed false")
 
     jpeg_store = load_param(exl, "local_filestore:")
 
-    useTS = load_param(exl, "use_timestamps:")
-    if useTS == "true":
-        numberPics = False
+    use_ts = load_param(exl, "use_timestamps:")
+    if use_ts == "true":
+        number_pictures = False
     else:
-        if useTS == "false":
-            numberPics = True
+        if use_ts == "false":
+            number_pictures = True
         else:
             print("Illegal timestamp selection - defaulting to timestamping")
-            numberPics = False
+            number_pictures = False
 
-    triggerStr = load_param(exl, "motion_trigger_level:")
+    trigger_string = load_param(exl, "motion_trigger_level:")
 
     try:
-        Trigger = float(triggerStr)
+        sensitivityChange.value = float(trigger_string)
     except:
-        print("Illegal value for trigger", triggerStr)
+        print("Illegal value for trigger", trigger_string)
         sys.exit()
 
-    sleepDelayTxt = load_param(exl, "triggerdelay:")
+    sleep_delay_text = load_param(exl, "triggerdelay:")
 
     try:
-        sleepDelay = float(sleepDelayTxt)
+        sleepDelay = float(sleep_delay_text)
     except:
-        print("Illegal value for trigger delay,defaulting to 1.0:", sleepDelayTxt)
+        print("Illegal value for trigger delay,defaulting to 1.0:", sleep_delay_text)
         sleepDelay = 1.0
 
     # Look for new .ssh directory content
@@ -225,7 +223,7 @@ def configure():
     sshKeyLoc = load_param(exl, "ssh_directory:")
     if sshKeyLoc != "":
         newKeyDir = load_param(exl, "new_ssh_elements:")
-        if newKeyDir != None:
+        if newKeyDir is not None:
             copy_ssh_keys.update_keys(newKeyDir, sshKeyLoc)
 
     #
@@ -250,8 +248,7 @@ def configure():
 
     if debug:
         print("Configuration values as read :")
-        print("Trigger:", Trigger)
-        sensitivityChange.value = Trigger
+        print("Trigger:", sensitivityChange.value)
         print("TriggerDelayTime(secs):", sleepDelay)
         print("LookFor:", lifeforms)
         print("Remote hostname", hostname)
@@ -259,7 +256,7 @@ def configure():
         print("Remote path", path)
         print("HD selected:", high_def)
         print("Local image storage:", jpeg_store)
-        print("Use timestamps:", not numberPics)
+        print("Use timestamps:", not number_pictures)
         print(".ssh directory :", sshKeyLoc)
         print("New .ssh directory contents:", newKeyDir)
 
@@ -278,16 +275,17 @@ live_image_time_saved = datetime.datetime.now() - datetime.timedelta(minutes=70)
 
 
 def directly_save_image(webcam_file, frame, lock):
+    """Save this image ito the filestore without it going via motion detection and yolo"""
     global live_image_time_saved
 
     acq = lock.acquire(block=False)  # Do this if we can but don't get in the way
 
     if acq:
-        timeExpired = (
+        time_expired = (
             datetime.timedelta(minutes=60)
             < datetime.datetime.now() - live_image_time_saved
         )
-        if timeExpired:
+        if time_expired:
             # Convert to RGB
 
             cols = cv.cvtColor(frame, cv.COLOR_BGR2RGB)
@@ -302,7 +300,7 @@ def directly_save_image(webcam_file, frame, lock):
 
             # Send elsewhere
 
-            scp_status = send_file(webcam_file)
+            send_file(webcam_file)
 
             # Record when
 
@@ -310,20 +308,21 @@ def directly_save_image(webcam_file, frame, lock):
         lock.release()
 
 
-def clamp(n, minn, maxn):
+def clamp(value, minn, maxn):
     """Clamp a value between limits"""
-    n = minn if n <= minn else maxn if maxn <= n else n
-    return n
+    value = minn if value <= minn else maxn if maxn <= value else value
+    return value
 
 
 def generate(yolo_process_q, lock):
-    global Trigger
+    """Generate some images and pass on the ones that show motion"""
 
     # Some configuration values
 
     debug = False
 
     sensitivity = 0
+    trigger = 0
 
     webcam_file = jpeg_store + "testSnapshot.jpg"
 
@@ -336,7 +335,6 @@ def generate(yolo_process_q, lock):
 
     print("Configuration values :")
     print("Node ", node, "software version", version)
-    sensitivityChange.value = Trigger
     print("Trigger:", sensitivityChange.value)
     print("TriggerDelayTime(secs):", sleepDelay)
     print("LookFor:", lifeforms)
@@ -345,7 +343,7 @@ def generate(yolo_process_q, lock):
     print("Remote path", path)
     print("HD selected:", high_def)
     print("Local image storage:", jpeg_store)
-    print("Use timestamps:", not numberPics)
+    print("Use timestamps:", not number_pictures)
     print("New .ssh directory contents:", newKeyDir)
     print(".ssh directory :", sshKeyLoc)
 
@@ -358,7 +356,7 @@ def generate(yolo_process_q, lock):
     #   Something like 10 percent of all the pixels
     #   Changed to be changed pixels. hopefully less dependent on brightness
 
-    pixel_diff_threshold = 128 * width * height * Trigger / 100
+    pixel_diff_threshold = 128 * width * height * sensitivityChange.value / 100
 
     #   Setup video capture
     #   the 0 lets opencv figure it out which it does nicely when there
@@ -420,17 +418,20 @@ def generate(yolo_process_q, lock):
             lower_trigger_limit = 2.0
             upper_trigger_limit = 3.5
             divisions = (upper_trigger_limit - lower_trigger_limit) / 50.0
-            if debug:
-                print("trigger:", Trigger)
-            Trigger = Trigger - sensitivity * divisions
-            Trigger = clamp(Trigger, lower_trigger_limit, upper_trigger_limit)
-            if debug:
-                print("trigger:", Trigger)
 
-            pixel_diff_threshold = 128 * width * height * Trigger / 100
-            sensitivityChange.value = Trigger
+            trigger = sensitivityChange.value
             if debug:
-                print("Trigger value :", Trigger, detected, rejected)
+                print("trigger:", trigger)
+            trigger = trigger - sensitivity * divisions
+            trigger = clamp(trigger, lower_trigger_limit, upper_trigger_limit)
+            if debug:
+                print("trigger:", trigger)
+
+            pixel_diff_threshold = 128 * width * height * trigger / 100
+            sensitivityChange.value = trigger
+
+            if debug:
+                print("Trigger value :", trigger, detected, rejected)
         frame_count += 1
         frame_count = frame_count % FRAME_CYCLE
 
@@ -483,20 +484,22 @@ def generate(yolo_process_q, lock):
 # Define a function that will run in a separate process
 
 
-#
-# Some of these are rather unlikely
-# given where we live
-#
-# possfile_save_qle lifeforms yolo will detect are:
-#    {"person","bear","bird","cat", "cow","dog","elephant","giraffe", "horse", "sheep","zebra",}
-#
-# You can also put car or truck in here...
-#
-# Detect whats in the image using yolo
-#
-
-
 def lifeforms_scan(frame):
+    """
+
+    Possible lifeforms this will detect are:
+       {"person","bear","bird","cat", "cow","dog","elephant","giraffe", "horse", "sheep","zebra",}
+
+    Some of these are rather unlikely
+    given where we live
+
+    You can also put car or truck in here...
+
+    Detect whats in the image using yolo
+
+
+    """
+
     debug = False
 
     # Need an entry point that takes an image
@@ -533,7 +536,6 @@ def analyse(yolo_process_q, file_save_q):
 
     rejects = 0
     found_someone = 0
-    global Trigger
     global performance_log_file
 
     debug = False
@@ -654,7 +656,7 @@ def preserve(file_save_q, lock):
         image = im.fromarray(frame)
 
         outname = filenames.image_name(
-            NumberPics, jpeg_store, node, frame_count, timestamp, False
+            number_pictures, jpeg_store, node, frame_count, timestamp, False
         )
 
         if debug:
@@ -674,7 +676,7 @@ def preserve(file_save_q, lock):
 
         if scp_status:
             newname = filenames.image_name(
-                NumberPics, jpeg_store, node, frame_count, timestamp, True
+                number_pictures, jpeg_store, node, frame_count, timestamp, True
             )
             os.system("touch " + newname)  # if inotify is watching prod it
             os.rename(outname, newname)
@@ -751,7 +753,9 @@ def re_transmit(lock):
         #   If we succeed then rename the file as local... implying it also exists remotely
 
         if scp_status:
-            newname = filenames.add_in_local_to_filename(NumberPics, outname, False)
+            newname = filenames.add_in_local_to_filename(
+                number_pictures, outname, False
+            )
 
             if newname != "":
                 os.system("touch " + newname)  # if inotify is watching prod it
@@ -782,13 +786,13 @@ def handler(signum):
     sys.exit()
 
 
-fileLock = multiprocessing.Lock()
-
+filestore_lock = multiprocessing.Lock()
 
 # 	Routines used to parse configuration file
 
 
 def find_element_substring(items, subst):
+    """Is subst in a string somewhere in list of items ?"""
     for index in range(len(items)):
         if subst in items[index]:
             return index
@@ -796,6 +800,7 @@ def find_element_substring(items, subst):
 
 
 def load_param(exl, parameter):
+    """Extract string defining parameter from the list.. if possible"""
     index = find_element_substring(exl, parameter)
     if index == -1:
         print(parameter, "not defined in config file")
@@ -810,7 +815,6 @@ def load_param(exl, parameter):
 
 def main():
     """setup processes, start and monitor them"""
-    global cap
 
     configure()
 
@@ -837,7 +841,7 @@ def main():
     # Create instances of the Process class, one for each function
 
     process_1 = Process(
-        name="MotionDetect", target=generate, args=(yolo_process_q, fileLock)
+        name="MotionDetect", target=generate, args=(yolo_process_q, filestore_lock)
     )
 
     process_2 = Process(
@@ -854,11 +858,11 @@ def main():
         target=preserve,
         args=(
             file_save_q,
-            fileLock,
+            filestore_lock,
         ),
     )
 
-    process_4 = Process(name="remoteCopy", target=re_transmit, args=(fileLock,))
+    process_4 = Process(name="remoteCopy", target=re_transmit, args=(filestore_lock,))
 
     # Start processes
 
@@ -937,5 +941,4 @@ def main():
 
 
 if __name__ == "__main__":
-    """Routine entry point"""
     main()

@@ -1,9 +1,8 @@
-'''
+"""
 
 Manage low storage conditions
 
-'''
-
+"""
 
 
 import os
@@ -20,7 +19,6 @@ def running_low(folder, limit):
     This is to avoid a problem on unattended infrequently managed systems
 
     """
-
 
     try:
         total, used, free = shutil.disk_usage(folder)
@@ -69,7 +67,7 @@ def delete_oldest(folder):
 
 
 def make_space(folder, limit):
-    ''' If space is low,  delete a few, releasing lock in between '''
+    """If space is low,  delete a few, releasing lock in between"""
     space_low = running_low(folder, limit)
     if space_low:  # delete a few, releasing lock in between
         delete_oldest(folder)
