@@ -104,7 +104,7 @@ path = ""
 
 Trigger = 5  # Roughly, the percentage change that triggers a snapshot
 sleepDelay = 1.0  # Time to look away after a motion detect to avoid overloads
-frame_cycle = 1024
+FRAME_CYCLE = 1024
 
 # Avoid generating massive queues
 
@@ -232,10 +232,10 @@ def configure():
     #   Not a lot of error checking for this one...
     #
     #
-    lifeformsText = load_param(exl, "lookfor:")
-    lifeformsTa = lifeformsText.replace("]", "")
-    lifeformsTb = lifeformsTa.replace("[", "")
-    lifeformsc = lifeformsTb.replace("'", "")
+    lifeforms_text = load_param(exl, "lookfor:")
+    lifeforms_ta = lifeforms_text.replace("]", "")
+    lifeforms_tb = lifeforms_ta.replace("[", "")
+    lifeformsc = lifeforms_tb.replace("'", "")
     lifeforms = set(lifeformsc.split(","))
 
     #   Check filestore location exists
@@ -277,7 +277,7 @@ live_image_time_saved = datetime.datetime.now() - datetime.timedelta(minutes=70)
 # Which bypasses the normal pipeline
 
 
-def directly_save_image(webcamFile, frame, lock):
+def directly_save_image(webcam_file, frame, lock):
     global live_image_time_saved
 
     acq = lock.acquire(block=False)  # Do this if we can but don't get in the way
@@ -298,11 +298,11 @@ def directly_save_image(webcamFile, frame, lock):
 
             # Save locally
 
-            image.save(webcamFile)
+            image.save(webcam_file)
 
             # Send elsewhere
 
-            scp_status = send_file(webcamFile)
+            scp_status = send_file(webcam_file)
 
             # Record when
 
@@ -311,15 +311,13 @@ def directly_save_image(webcamFile, frame, lock):
 
 
 def clamp(n, minn, maxn):
-    ''' Clamp a value between limits '''
+    """Clamp a value between limits"""
     n = minn if n <= minn else maxn if maxn <= n else n
     return n
 
 
 def generate(yolo_process_q, lock):
-    global framePairCount
     global Trigger
-    global frame_cycle
 
     # Some configuration values
 
@@ -327,7 +325,7 @@ def generate(yolo_process_q, lock):
 
     sensitivity = 0
 
-    webcamFile = jpeg_store + "testSnapshot.jpg"
+    webcam_file = jpeg_store + "testSnapshot.jpg"
 
     if high_def:
         width = 1920
@@ -355,12 +353,12 @@ def generate(yolo_process_q, lock):
 
     # "sort of" live output`
 
-    print("Live(ish) output on :", webcamFile)
+    print("Live(ish) output on :", webcam_file)
 
     #   Something like 10 percent of all the pixels
     #   Changed to be changed pixels. hopefully less dependent on brightness
 
-    PixelDiffThreshold = 128 * width * height * Trigger / 100
+    pixel_diff_threshold = 128 * width * height * Trigger / 100
 
     #   Setup video capture
     #   the 0 lets opencv figure it out which it does nicely when there
@@ -404,8 +402,8 @@ def generate(yolo_process_q, lock):
             break  # Result in child terminating and tripping of watchdog
 
         if frame_count == 0:  # Only check on this at a slowish rate
-            directly_save_image(webcamFile, frame1, lock)
-        #        if frame_count != 0 and 0 == frame_count % (frame_cycle - 1):
+            directly_save_image(webcam_file, frame1, lock)
+        #        if frame_count != 0 and 0 == frame_count % (FRAME_CYCLE - 1):
         if frame_count != 0 and 0 == frame_count % (512 - 1):
             #   Assess effectiveness of trigger level
             power_ratio = detected / (detected + rejected)
@@ -419,22 +417,22 @@ def generate(yolo_process_q, lock):
                     sensitivity = 0  # Leave alone
             if debug:
                 print("Sensitivity:", sensitivity, " ratio:", power_ratio)
-            lowTlimit = 2.0
-            uppTlimit = 3.5
-            divisions = (uppTlimit - lowTlimit) / 50.0
+            lower_trigger_limit = 2.0
+            upper_trigger_limit = 3.5
+            divisions = (upper_trigger_limit - lower_trigger_limit) / 50.0
             if debug:
                 print("trigger:", Trigger)
             Trigger = Trigger - sensitivity * divisions
-            Trigger = clamp(Trigger, lowTlimit, uppTlimit)
+            Trigger = clamp(Trigger, lower_trigger_limit, upper_trigger_limit)
             if debug:
                 print("trigger:", Trigger)
 
-            PixelDiffThreshold = 128 * width * height * Trigger / 100
+            pixel_diff_threshold = 128 * width * height * Trigger / 100
             sensitivityChange.value = Trigger
             if debug:
                 print("Trigger value :", Trigger, detected, rejected)
         frame_count += 1
-        frame_count = frame_count % frame_cycle
+        frame_count = frame_count % FRAME_CYCLE
 
         framesBeingProcessed.value += 1  # Update watchdog
 
@@ -449,20 +447,20 @@ def generate(yolo_process_q, lock):
         num_diff = np.sum(difference)
 
         if debug:
-            num_diffNZ = cv.countNonZero(difference)
+            num_diff_nonzero = cv.countNonZero(difference)
             print(
-                PixelDiffThreshold,
+                pixel_diff_threshold,
                 num_diff,
-                num_diffNZ,
-                PixelDiffThreshold < abs(num_diff),
+                num_diff_nonzero,
+                pixel_diff_threshold < abs(num_diff),
             )
 
-        if PixelDiffThreshold < abs(num_diff):
+        if pixel_diff_threshold < abs(num_diff):
             timestamp = filenames.time_stamped_filename()
             qitem = (frame2, timestamp)
             yolo_process_q.put(qitem)
             directly_save_image(
-                webcamFile, frame2, lock
+                webcam_file, frame2, lock
             )  # Keep live image recent when changes occur
             if debug:
                 print("Motion detected, pushed frame", frame_count)
@@ -537,7 +535,6 @@ def analyse(yolo_process_q, file_save_q):
     found_someone = 0
     global Trigger
     global performance_log_file
-    global frame_cycle
 
     debug = False
 
@@ -576,7 +573,7 @@ def analyse(yolo_process_q, file_save_q):
             if debug:
                 print("No lifeforms!!")
 
-        if frame_cycle <= framesBeingProcessed.value:
+        if FRAME_CYCLE <= framesBeingProcessed.value:
             try:
                 with open(performance_log_file, "a+", encoding="ascii") as perf_log:
                     perf_log.write(
@@ -603,11 +600,14 @@ def analyse(yolo_process_q, file_save_q):
                 print(err)
 
 
-# Send image to somewhere non-local using scp
-# This could be anywhere on the internet
-
-
 def send_file(filename):
+    """
+
+    Send image to somewhere non-local using scp
+    This could be anywhere on the internet
+
+    """
+
     debug = False
 
     sent = True
@@ -626,8 +626,6 @@ def send_file(filename):
         sent = False
 
     return sent
-
-
 
 
 def preserve(file_save_q, lock):
@@ -688,7 +686,7 @@ def preserve(file_save_q, lock):
 
         frame_count += 1
         frame_count = (
-            frame_count % frame_cycle
+            frame_count % FRAME_CYCLE
         )  # Make these wrap around so they don't used unbounded levels of storage
 
         lock.release()
@@ -711,8 +709,8 @@ def re_transmit(lock):
         retransmissionActive.value += 1  # Watchdog
         sleep(window3)  # Whose update rate is low: beware
 
-        hostname = "google.com"  # example
-        response = os.system("ping -c 1 -w2 " + hostname + " > /dev/null 2>&1")
+        test_hostname = "google.com"  # example
+        response = os.system("ping -c 1 -w2 " + test_hostname + " > /dev/null 2>&1")
 
         if response != 0:
             if debug:

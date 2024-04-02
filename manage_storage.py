@@ -1,5 +1,15 @@
+'''
+
+Manage low storage conditions
+
+'''
+
+
+
 import os
 import shutil
+
+SUPPRESSDELETION = False
 
 
 def running_low(folder, limit):
@@ -11,15 +21,11 @@ def running_low(folder, limit):
 
     """
 
-    debug = False
 
     try:
         total, used, free = shutil.disk_usage(folder)
     except:
         return False
-
-    if debug:
-        print("Free: %d GiB" % (free // (2 ** 30)))
 
     return bool(free < limit)
 
@@ -27,13 +33,13 @@ def running_low(folder, limit):
 def delete_oldest(folder):
     """
 
-    Make some space be deleting the oldeest file
+    Make some space by deleting the oldest file
     folder is the name of the folder in which we
     have to perform the delete operation
     changing the current working directory
     to the folder specified
     Protect from exception in case this doesn't exist
-    to protect us from removal of inappropriate file
+    to protect us from inappropriate file removal
 
     """
 
@@ -54,7 +60,7 @@ def delete_oldest(folder):
     if debug:
         print("Oldest data file", folder + oldest_file, " to be deleted")
 
-    if not SuppressDeletion:
+    if not SUPPRESSDELETION:
         try:
             os.remove(os.path.abspath(folder + oldest_file))
         except Exception as err:
@@ -63,10 +69,9 @@ def delete_oldest(folder):
 
 
 def make_space(folder, limit):
+    ''' If space is low,  delete a few, releasing lock in between '''
     space_low = running_low(folder, limit)
     if space_low:  # delete a few, releasing lock in between
         delete_oldest(folder)
         delete_oldest(folder)
         delete_oldest(folder)
-
-
