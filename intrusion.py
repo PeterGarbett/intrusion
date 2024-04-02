@@ -54,9 +54,11 @@
 import multiprocessing
 from multiprocessing import Process
 from multiprocessing import Queue
-from multiprocessing import Value
-from multiprocessing import Pool
-from multiprocessing import active_children
+
+# from multiprocessing import Value
+# from multiprocessing import Pool
+# from multiprocessing import active_children
+
 import queue
 from time import sleep
 import datetime
@@ -70,7 +72,8 @@ import signal
 import cv2 as cv
 import numpy as np
 import paramiko
-from paramiko import SSHClient
+
+# from paramiko import SSHClient
 from PIL import Image as im
 from scp import SCPClient
 
@@ -308,15 +311,13 @@ def directly_save_image(webcamFile, frame, lock):
         lock.release()
 
 
-# Clamp a value between limits
-
-
 def clamp(n, minn, maxn):
+    ''' Clamp a value between limits '''
     n = minn if n <= minn else maxn if maxn <= n else n
     return n
 
 
-def generate(q, lock):
+def generate(yolo_process_q, lock):
     global framePairCount
     global Trigger
     global frame_cycle
@@ -374,8 +375,6 @@ def generate(q, lock):
     cap.set(3, width)
     cap.set(4, height)
     cap.set(6, cv.VideoWriter.fourcc("M", "J", "P", "G"))
-
-    #   Setup first pass flag
 
     frame_count = 0
     detected = 0
@@ -462,14 +461,14 @@ def generate(q, lock):
         if PixelDiffThreshold < abs(num_diff):
             timestamp = filenames.time_stamped_filename()
             qitem = (frame2, timestamp)
-            q.put(qitem)
+            yolo_process_q.put(qitem)
             directly_save_image(
                 webcamFile, frame2, lock
             )  # Keep live image recent when changes occur
             if debug:
                 print("Motion detected, pushed frame", frame_count)
             sleep(sleepDelay)
-            while frameLimit < q.qsize():
+            while frameLimit < yolo_process_q.qsize():
                 sleep(frameDelay)  # Prevent system overload
             detected += 1
         else:
@@ -517,38 +516,45 @@ def lifeforms_scan(frame):
 
     if len(found_lifeforms) == 0:
         return False
-    else:
-        return True
+
+    return True
 
 
-# get image from queue 'q'
-# Analyse image using yolo
-# If its interesting put it on queue 'file_save_q'
-
-rejects = 0
-foundSomeone = 0
 #   Filename to log performance data
 
-perfLog = ""
+performance_log_file = ""
 
 
-def analyse(q, file_save_q):
-    global rejects
-    global foundSomeone
+def analyse(yolo_process_q, file_save_q):
+    """
+
+    Get image from queue 'yolo_process_q'
+    Analyse image using yolo
+    If it is interesting put it on queue 'file_save_q'
+
+    """
+
+    rejects = 0
+    found_someone = 0
     global Trigger
-    global perfLog
+    global performance_log_file
     global frame_cycle
 
     debug = False
 
-    if perfLog == "":
-        perfLog = jpeg_store + "perfLog_" + filenames.time_stamped_filename() + ".txt"
+    if performance_log_file == "":
+        performance_log_file = (
+            jpeg_store
+            + "performance_log_file_"
+            + filenames.time_stamped_filename()
+            + ".txt"
+        )
 
     while True:
         yoloAnalysisActive.value += 1
 
         try:
-            frame_and_stamp = q.get_nowait()
+            frame_and_stamp = yolo_process_q.get_nowait()
         except queue.Empty:
             sleep(window)
             continue
@@ -563,7 +569,7 @@ def analyse(q, file_save_q):
 
         if lifeforms_scan(item):
             file_save_q.put(frame_and_stamp)
-            foundSomeone += 1
+            found_someone += 1
             if debug:
                 print("Lifeforms exist!")
         else:
@@ -573,28 +579,27 @@ def analyse(q, file_save_q):
 
         if frame_cycle <= framesBeingProcessed.value:
             try:
-                f = open(perfLog, "a+")
-                f.write(
-                    str(datetime.datetime.now())
-                    + ": Trigger level:"
-                    + str(sensitivityChange.value)
-                    + "\nFrame pairs:"
-                    + str(framesBeingProcessed.value)
-                    + " Frames with motion:"
-                    + str(rejects + foundSomeone)
-                    + " Frames with people:"
-                    + str(foundSomeone)
-                    + "\nFrames queued to analyse "
-                    + str(q.qsize())
-                    + " Frames queued to save:"
-                    + str(file_save_q.qsize())
-                    + "\n"
-                )
-                print("Performance data written on ", perfLog)
-                framesBeingProcessed.value = 0
-                rejects = 0
-                foundSomeone = 0
-                f.close()
+                with open(performance_log_file, "a+", encoding="ascii") as perf_log:
+                    perf_log.write(
+                        str(datetime.datetime.now())
+                        + ": Trigger level:"
+                        + str(sensitivityChange.value)
+                        + "\nFrame pairs:"
+                        + str(framesBeingProcessed.value)
+                        + " Frames with motion:"
+                        + str(rejects + found_someone)
+                        + " Frames with people:"
+                        + str(found_someone)
+                        + "\nFrames queued to analyse "
+                        + str(yolo_process_q.qsize())
+                        + " Frames queued to save:"
+                        + str(file_save_q.qsize())
+                        + "\n"
+                    )
+                    print("Performance data written on ", performance_log_file)
+                    framesBeingProcessed.value = 0
+                    rejects = 0
+                    found_someone = 0
             except Exception as err:
                 print(err)
 
@@ -620,17 +625,19 @@ def send_file(filename):
         if debug:
             print("Failed to save file to remote", err)
         sent = False
-        pass
 
     return sent
 
 
-# See if we are running out of local storage
-# and delete a few oldest files if so
-# This is to avoid a problem on unattended infrequently managed systems
-
-
 def running_low(folder, limit):
+    """
+
+    See if we are running out of local storage
+    and delete a few oldest files if so
+    This is to avoid a problem on unattended infrequently managed systems
+
+    """
+
     debug = False
 
     try:
@@ -641,21 +648,23 @@ def running_low(folder, limit):
     if debug:
         print("Free: %d GiB" % (free // (2 ** 30)))
 
-    if free < limit:
-        return True
-    else:
-        return False
+    return bool(free < limit)
 
 
 def delete_oldest(folder):
-    debug = False
+    """
 
-    # folder is the name of the folder in which we
-    # have to perform the delete operation
-    # changing the current working directory
-    # to the folder specified
-    # Protect from exception in case this doesn't exist
-    # to protect us from removal of inappropriate file
+    Make some space be deleting the oldeest file
+    folder is the name of the folder in which we
+    have to perform the delete operation
+    changing the current working directory
+    to the folder specified
+    Protect from exception in case this doesn't exist
+    to protect us from removal of inappropriate file
+
+    """
+
+    debug = False
 
     try:
         os.chdir(os.path.join(os.getcwd(), folder))
@@ -688,11 +697,14 @@ def make_space(folder, limit):
         delete_oldest(folder)
 
 
-# Stage 3 of our image pipeline. We have something worth saving
-# so set about keeping it.
-
-
 def preserve(file_save_q, lock):
+    """
+
+    Stage 3 of our image pipeline. We have something worth saving
+    so set about keeping it.
+
+    """
+
     debug = False
 
     frame_count = 0
@@ -719,7 +731,7 @@ def preserve(file_save_q, lock):
 
         #   Save file locally
 
-        acq = lock.acquire(block=True)
+        lock.acquire(block=True)
         image.save(outname)
 
         #   Try to send over the internet
@@ -749,16 +761,17 @@ def preserve(file_save_q, lock):
         lock.release()
 
 
-# re_transmit - which is in fact a misnomer it's more like retry
-# transferring something that didn't go the first time.
-# This is intended to be a background task and would come into play
-# if the connection to the remote machine went down transiently
-# I assumme here we aren't sending data out to a machine on the LAN
-# the main case of interest is lost internet, so we test for it
-# working 1st
-
-
 def re_transmit(lock):
+    """
+    re_transmit - which is in fact a misnomer it's more like retry
+    transferring something that didn't go the first time.
+    This is intended to be a background task and would come into play
+    if the connection to the remote machine went down transiently
+    I assumme here we aren't sending data out to a machine on the LAN
+    the main case of interest is lost internet, so we test for it
+    working 1st
+    """
+
     debug = False
 
     while True:
@@ -827,8 +840,8 @@ def re_transmit(lock):
 # Attempt orderly shutdown
 
 
-def handler(signum, frame):
-    ''' Catch termination signal so we can kill our children... yes really '''
+def handler(signum):
+    """Catch termination signal so we can kill our children... yes really"""
     signame = signal.Signals(signum).name
     print("Caught signal", signame)
 
@@ -865,6 +878,7 @@ def load_param(exl, parameter):
 
 
 def main():
+    """setup processes, start and monitor them"""
     global cap
 
     configure()
@@ -873,7 +887,7 @@ def main():
 
     debug = False
 
-    parent = multiprocessing.parent_process()
+    # parent = multiprocessing.parent_process()
     parent_pid = 0  # parent.pid
 
     expected_children = 4
@@ -886,12 +900,14 @@ def main():
 
     # Create an instance of the Queue class
 
-    yolo_process_q  = Queue()
+    yolo_process_q = Queue()
     file_save_q = Queue()
 
     # Create instances of the Process class, one for each function
 
-    process_1 = Process(name="MotionDetect", target=generate, args=(yolo_process_q, fileLock))
+    process_1 = Process(
+        name="MotionDetect", target=generate, args=(yolo_process_q, fileLock)
+    )
 
     process_2 = Process(
         name="yoloFilter",
@@ -923,12 +939,18 @@ def main():
     signal.signal(signal.SIGTERM, handler)
 
     if debug:
-        print("PIDs",parent_pid, process_1.pid,process_2.pid,process_3.pid,process_4.pid)
+        print(
+            "PIDs",
+            parent_pid,
+            process_1.pid,
+            process_2.pid,
+            process_3.pid,
+            process_4.pid,
+        )
 
     #   Watchdog
 
     framesBeingProcessed.value = 0
-
 
     while True:
 
@@ -962,7 +984,7 @@ def main():
             print("loop count for yolo analysis:", yoloAnalysisActive.value)
             print("loop count for filestore handling:", filestoreActive.value)
             print(
-                "loop count for reTramission activity:", retransmissionActive.value
+                "loop count for reTransmission activity:", retransmissionActive.value
             )  # Check this at a slower rate
 
         if (
@@ -971,7 +993,7 @@ def main():
             or filestoreActive.value == 0
             or retransmissionActive.value == 0
         ):
-            print("processing has stopped, exiting anticipating a restart")
+            print("Processing has stopped, exit anticipating a systemd restart")
             print("loop count for frame generate:", framesBeingProcessed.value)
             print("loop count for yolo analysis:", yoloAnalysisActive.value)
             print("loop count for filestore handling:", filestoreActive.value)
@@ -984,5 +1006,5 @@ def main():
 
 
 if __name__ == "__main__":
-    ''' Routine entry point '''
+    """Routine entry point"""
     main()
