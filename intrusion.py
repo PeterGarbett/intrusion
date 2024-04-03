@@ -228,9 +228,6 @@ def configure():
         print("Illegal value for trigger lower bound ", trigger_string)
         sys.exit()
 
-
-
-
     sleep_delay_text = load_param(exl, "triggerdelay:")
 
     try:
@@ -402,8 +399,6 @@ def generate(yolo_process_q, lock):
     frame_count = 0
     detected = 0
     rejected = 0
-
-
 
     # video frame capture loop
 
@@ -789,10 +784,10 @@ def re_transmit(lock):
                 os.rename(outname, newname)
                 if debug:
                     print("File renamed from", outname, " to ", newname)
+            lock.release()
         else:
-            sleep(1024)
-
-        lock.release()
+            lock.release()
+            sleep(FRAME_CYCLE)
 
 
 #
