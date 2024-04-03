@@ -700,8 +700,8 @@ def preserve(file_save_q, lock):
             newname = filenames.image_name(
                 number_pictures, jpeg_store, node, frame_count, timestamp, True
             )
-            os.system("touch " + newname)  # if inotify is watching prod it
             os.rename(outname, newname)
+            os.system("touch " + newname)  # if inotify is watching prod it
             if debug:
                 print("File renamed from", outname, " to ", newname)
         else:
@@ -781,8 +781,8 @@ def re_transmit(lock):
             )
 
             if newname != "":
-                os.system("touch " + newname)  # if inotify is watching prod it
                 os.rename(outname, newname)
+                os.system("touch " + newname)  # if inotify is watching prod it
                 if debug:
                     print("File renamed from", outname, " to ", newname)
             lock.release()
