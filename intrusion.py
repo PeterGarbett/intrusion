@@ -732,6 +732,7 @@ def re_transmit(lock):
     while True:
         retransmissionActive.value += 1  # Watchdog
         sleep(window3)  # Whose update rate is low: beware
+        retransmissionActive.value += 1  # Watchdog
 
         test_hostname = "google.com"  # example
         response = os.system("ping -c 1 -w2 " + test_hostname + " > /dev/null 2>&1")
@@ -787,7 +788,10 @@ def re_transmit(lock):
             lock.release()
         else:
             lock.release()
-            sleep(FRAME_CYCLE)
+            retransmissionActive.value += 1  # Watchdog
+            sleep(FRAME_CYCLE / 2)
+            retransmissionActive.value += 1  # Watchdog
+            sleep(FRAME_CYCLE / 2)
 
 
 #
