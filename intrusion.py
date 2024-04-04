@@ -801,7 +801,7 @@ def re_transmit(lock):
 # Attempt orderly shutdown
 
 
-def handler(signum):
+def signal_handler(signum,frame):
     """Catch termination signal so we can kill our children... yes really"""
     signame = signal.Signals(signum).name
     print("Caught signal", signame)
@@ -897,7 +897,7 @@ def main():
     process_3.start()
     process_4.start()
 
-    signal.signal(signal.SIGTERM, handler)
+    signal.signal(signal.SIGTERM, signal_handler)
 
     if debug:
         print(
