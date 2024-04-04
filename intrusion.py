@@ -116,6 +116,9 @@ window = 0.25  # analysis polling rate limiter
 window2 = 0.1  # filestore management polling rate limiter
 window3 = 60  # re_transmit polling rate
 
+
+video_source = ""
+
 #
 #   Watchdog variables for sub-processes
 #
@@ -149,6 +152,7 @@ def configure():
     global newKeyDir
     global sshKeyLoc
     global lifeforms
+    global video_source
 
     debug = False
 
@@ -227,6 +231,9 @@ def configure():
     except:
         print("Illegal value for trigger lower bound ", trigger_string)
         sys.exit()
+
+    video_source = load_param(exl, "video_source:")
+    print(video_source) 
 
     sleep_delay_text = load_param(exl, "triggerdelay:")
 
@@ -334,7 +341,7 @@ def clamp(value, minn, maxn):
 
 def generate(yolo_process_q, lock):
     """Generate some images and pass on the ones that show motion"""
-
+    global video_source
     # Some configuration values
 
     debug = False
@@ -352,6 +359,7 @@ def generate(yolo_process_q, lock):
         height = 480
 
     print("Configuration values :")
+    print("Video Source:",video_source)
     print("Node ", node, "software version", version)
     print("TriggerDelayTime(secs):", sleepDelay)
     print("LookFor:", lifeforms)
@@ -384,12 +392,11 @@ def generate(yolo_process_q, lock):
     divisions = (upper_trigger_limit - lower_trigger_limit) / 50.0
 
     #   Setup video capture
-    #   the 0 lets opencv figure it out which it does nicely when there
-    #   is only one camera
+    #   video_source is defined in the config file
 
-    cap = cv.VideoCapture(0)
+    cap = cv.VideoCapture(video_source)
     if not cap.isOpened():
-        print("Cannot open camera")
+        print("Cannot open video source ")
         sys.exit()
 
     cap.set(3, width)
@@ -411,6 +418,7 @@ def generate(yolo_process_q, lock):
         # if frame is read correctly ret is True
         if not ret:
             print("Can't receive frame (stream end?). Exiting ...")
+            sleep(60)   # Allow yolo to catch up
             cap.release()
             break  # Result in child terminating and tripping of watchdog
 
@@ -421,6 +429,7 @@ def generate(yolo_process_q, lock):
         # if frame is read correctly ret is True
         if not ret:
             print("Can't receive frame (stream end?). Exiting ...")
+            sleep(60)   # Allow yolo to catch up
             cap.release()
             break  # Result in child terminating and tripping of watchdog
 
