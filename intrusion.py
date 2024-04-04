@@ -233,7 +233,6 @@ def configure():
         sys.exit()
 
     video_source = load_param(exl, "video_source:")
-    print(video_source) 
 
     sleep_delay_text = load_param(exl, "triggerdelay:")
 
