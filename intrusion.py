@@ -378,7 +378,7 @@ def generate(yolo_process_q, lock):
 
     # "sort of" live output`
 
-    print("Live(ish) output on :", webcam_file)
+    print("Unconditional periodic output on :", webcam_file)
 
     #   Something like 10 percent of all the pixels
     #   Changed to be changed pixels. hopefully less dependent on brightness
@@ -434,26 +434,30 @@ def generate(yolo_process_q, lock):
 
         if frame_count == 0:  # Only check on this at a slowish rate
             directly_save_image(webcam_file, frame1, lock)
-        #        if frame_count != 0 and 0 == frame_count % (FRAME_CYCLE - 1):
-        if frame_count != 0 and 0 == frame_count % (512 - 1):
+
+        if frame_count != 0 and 0 == frame_count % ((FRAME_CYCLE/128) - 1):
             #   Assess effectiveness of trigger level
             power_ratio = detected / (detected + rejected)
+
+            sensitivity = 0  # Default : Leave alone
 
             if abs(power_ratio - 1.0) < 0.95:  # Want about 5%
                 sensitivity = -1
             else:
-                if abs(power_ratio) < 0.01:  # Fewer than 1% show movement
+                if abs(power_ratio) < 0.04:  # few candidates
                     sensitivity = 1
-                else:
-                    sensitivity = 0  # Leave alone
+
             if debug:
                 print("Sensitivity:", sensitivity, " ratio:", power_ratio)
 
             trigger = sensitivityChange.value
+
             if debug:
                 print("trigger:", trigger)
+
             trigger = trigger - sensitivity * divisions
             trigger = clamp(trigger, lower_trigger_limit, upper_trigger_limit)
+
             if debug:
                 print("trigger:", trigger)
 
