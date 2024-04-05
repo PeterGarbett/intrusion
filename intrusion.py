@@ -358,7 +358,7 @@ def generate(yolo_process_q, lock):
         height = 480
 
     print("Configuration values :")
-    print("Video Source:",video_source)
+    print("Video Source:", video_source)
     print("Node ", node, "software version", version)
     print("TriggerDelayTime(secs):", sleepDelay)
     print("LookFor:", lifeforms)
@@ -417,7 +417,7 @@ def generate(yolo_process_q, lock):
         # if frame is read correctly ret is True
         if not ret:
             print("Can't receive frame (stream end?). Exiting ...")
-            sleep(60)   # Allow yolo to catch up
+            sleep(60)  # Allow yolo to catch up
             cap.release()
             break  # Result in child terminating and tripping of watchdog
 
@@ -428,15 +428,16 @@ def generate(yolo_process_q, lock):
         # if frame is read correctly ret is True
         if not ret:
             print("Can't receive frame (stream end?). Exiting ...")
-            sleep(60)   # Allow yolo to catch up
+            sleep(60)  # Allow yolo to catch up
             cap.release()
             break  # Result in child terminating and tripping of watchdog
 
         if frame_count == 0:  # Only check on this at a slowish rate
             directly_save_image(webcam_file, frame1, lock)
 
-        if frame_count != 0 and 0 == frame_count % ((FRAME_CYCLE/128) - 1):
-            #   Assess effectiveness of trigger level
+        #   Periodically assess effectiveness of trigger level
+
+        if frame_count != 0 and 0 == frame_count % ((FRAME_CYCLE / 4) - 1):
             power_ratio = detected / (detected + rejected)
 
             sensitivity = 0  # Default : Leave alone
@@ -458,6 +459,11 @@ def generate(yolo_process_q, lock):
             trigger = trigger - sensitivity * divisions
             trigger = clamp(trigger, lower_trigger_limit, upper_trigger_limit)
 
+            # Reset for next sampling period
+
+            detected = 0
+            rejected = 1
+
             if debug:
                 print("trigger:", trigger)
 
@@ -466,6 +472,7 @@ def generate(yolo_process_q, lock):
 
             if debug:
                 print("Trigger value :", trigger, detected, rejected)
+
         frame_count += 1
         frame_count = frame_count % FRAME_CYCLE
 
@@ -813,7 +820,7 @@ def re_transmit(lock):
 # Attempt orderly shutdown
 
 
-def signal_handler(signum,frame):
+def signal_handler(signum, frame):
     """Catch termination signal so we can kill our children... yes really"""
     signame = signal.Signals(signum).name
     print("Caught signal", signame)
