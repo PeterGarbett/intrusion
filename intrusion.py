@@ -437,7 +437,7 @@ def generate(yolo_process_q, lock):
 
         #   Periodically assess effectiveness of trigger level
 
-        if frame_count != 0 and 0 == frame_count % ((FRAME_CYCLE / 4) - 1):
+        if frame_count != 0 and 0 == frame_count % ((FRAME_CYCLE / 8) - 1):
             power_ratio = detected / (detected + rejected)
 
             sensitivity = 0  # Default : Leave alone
@@ -556,6 +556,8 @@ def lifeforms_scan(frame):
         print("lifeforms found:", found_lifeforms)
 
     if len(found_lifeforms) == 0:
+        if debug:
+            print("return False")
         return False
 
     return True
