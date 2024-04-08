@@ -104,10 +104,23 @@ def start(image_file_name, direct_image, use_direct):
                     [box_x_coordinate, box_y_coordinate, box_width, box_height]
                 )
 
+
+#   Extract a list of the type of things we found
+
     items = list(set(class_ids))
     names = [str(classes[x]) for x in items]
 
-    return names
+    conf_threshold = 0.5
+    nms_threshold = 0.4
+
+    indices = cv2.dnn.NMSBoxes(boxes, confidences, conf_threshold, nms_threshold)
+
+    things = []
+    for i in indices:
+        things.append(classes[class_ids[i]])
+    types = list(set(things))
+
+    return types
 
 
 def yolo_image(image):
