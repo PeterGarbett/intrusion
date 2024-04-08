@@ -555,7 +555,7 @@ def lifeforms_scan(frame):
         print("found:", found)
         print("lifeforms found:", found_lifeforms)
 
-    if len(found_lifeforms) == 0:
+    if not found_lifeforms:
         if debug:
             print("return False")
         return False
@@ -600,7 +600,10 @@ def analyse(yolo_process_q, file_save_q):
             sleep(window)
             continue
 
+        # Decompose
+
         item = frame_and_stamp[0]
+        stamp = frame_and_stamp[1]
 
         if debug:
             print("analyse image")
@@ -609,7 +612,7 @@ def analyse(yolo_process_q, file_save_q):
         #   if we don't have too
 
         if lifeforms_scan(item):
-            file_save_q.put(frame_and_stamp)
+            file_save_q.put((item, stamp))
             found_someone += 1
             if debug:
                 print("Lifeforms exist!")
@@ -698,12 +701,15 @@ def preserve(file_save_q, lock):
         timestamp = frame_and_stamp[1]
         image = im.fromarray(frame)
 
+        if debug:
+            print("timestamp:", timestamp, "directory:", jpeg_store)
+
         outname = filenames.image_name(
             number_pictures, jpeg_store, node, frame_count, timestamp, False
         )
 
         if debug:
-            print("Save image", outname)
+            print("Save image:", outname)
 
         #   Save file locally
 
