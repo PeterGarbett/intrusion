@@ -577,11 +577,14 @@ def analyse(yolo_process_q, file_save_q):
 
     """
 
-    rejects = 0
-    found_someone = 0
     global performance_log_file
 
     debug = False
+    rejects = 0
+    found_someone = 0
+
+    yolo.initialise_yolo()
+
 
     if performance_log_file == "":
         performance_log_file = (
