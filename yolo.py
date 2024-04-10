@@ -151,4 +151,5 @@ if __name__ == "__main__":
 
     for name in imgnames:
         types = yolo_file(name)
-        print("Discovered :", types, " in ", name)
+        if not "person" in types:
+            print("no people in :", types, " in ", name)
