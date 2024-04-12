@@ -31,7 +31,7 @@ def initialise_yolo():
     net = cv2.dnn.readNet(weights, config)
 
 
-def yolo(image):
+def yolo_analysis(image):
     """use yolo on an image"""
     global net
 
@@ -130,26 +130,122 @@ def yolo(image):
 
 def yolo_image(image):
     """Use yolo on an image and return what is found"""
-    items = yolo(image)
+    items = yolo_analysis(image)
     return items
 
 
 def yolo_file(file_name):
     """Use yolo on an image file and return what is found"""
     image = cv2.imread(file_name)
-    items = yolo(image)
+    items = yolo_analysis(image)
 
     return items
 
 
-if __name__ == "__main__":
+#
+#   motion is lightweight but prone to false positives.
+#   Search through the images and produce a script
+#   that will remove those without items of interest.
+#   The view here allways has cars in it. Your situation may well differ
+#
+
+import yolo
+import glob
+import os
+import sys
+import intrusion
+import cv2
+
+animated = {
+    "person",
+    "bear",
+    "bird",
+    "cat",
+    "cow",
+    "dog",
+    "elephant",
+    "giraffe",
+    "horse",
+    "sheep",
+    "zebra",
+}
+
+#
+# Detect whats in the image using yolo
+#
+
+
+def main():
     """Test by using the routines on images in the current directory"""
 
-    imgnames = sorted(glob.glob("*.jpg"))
+    #   Use specified base directory
+    #   Should be writable so I can place a list
+    #   of analysed items into it
+    #   Defaults to "" which means the current directory
 
-    initialise_yolo()
+    inputargs = sys.argv
+    sys.argv.pop(0)
 
-    for name in imgnames:
-        types = yolo_file(name)
-        if not "person" in types:
-            print("no people in :", types, " in ", name)
+    if len(inputargs) == 0:
+        baseDirectory = ""
+    else:
+        if len(inputargs) != 1:
+            print("badly specified base directory, exiting")
+            exit()
+        else:
+            baseDirectory = inputargs[0]
+
+    yolo.initialise_yolo()
+
+    #   Output the script header
+
+    print("#!/bin/bash")
+    print("#")
+    print("#\tScript to remove boring images")
+    print("#")
+    print("#\tBase directory:", baseDirectory)
+    print("#")
+
+    #   Pull out the previous results. This is important because yolo
+    #   uses a fair ammount of resource so we avoid redoing things
+    #   This is chosen to be saved as text for ease of inspection and test
+
+    interesting = []
+    try:
+        with open(baseDirectory + "interesting.txt", "r") as file:
+            for line in file:
+                x = line.replace("\n", "")
+                if x != "":
+                    interesting.append(x)
+            file.close()
+    except:
+        interesting = []
+
+    imgnames = sorted(glob.glob(baseDirectory + "*.jpg"))
+
+    allItems = {}
+
+    for image_file in imgnames:
+        decomp = os.path.basename(image_file)
+        if decomp not in interesting:
+            image = cv2.imread(image_file)
+            found = intrusion.lifeforms_scan(image, animated)
+            if found:
+                allItems = set(found).union(allItems)
+                print("#", image_file, " ", list(allItems))
+                interesting.append(os.path.basename(image_file))
+            else:
+                decomp = os.path.basename(image)
+                print("rm -f ", decomp)
+
+    # Write back list of items with interesting objects found in them
+
+    with open(baseDirectory + "interesting.txt", "w") as file:
+        file.write("\n".join(str(item) for item in interesting))
+        file.close()
+
+
+if __name__ == "__main__":
+    main()
+
+

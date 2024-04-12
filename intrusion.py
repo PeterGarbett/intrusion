@@ -522,10 +522,11 @@ def generate(yolo_process_q, lock):
     sys.exit(0)
 
 
-# Define a function that will run in a separate process
 
 
-def lifeforms_scan(frame):
+
+
+def lifeforms_scan(frame,lifeforms):
     """
 
     Possible lifeforms this will detect are:
@@ -555,12 +556,7 @@ def lifeforms_scan(frame):
         print("found:", found)
         print("lifeforms found:", found_lifeforms)
 
-    if not found_lifeforms:
-        if debug:
-            print("return False")
-        return False
-
-    return True
+    return  found_lifeforms
 
 
 #   Filename to log performance data
@@ -578,6 +574,7 @@ def analyse(yolo_process_q, file_save_q):
     """
 
     global performance_log_file
+    global lifeforms
 
     debug = False
     rejects = 0
@@ -614,7 +611,7 @@ def analyse(yolo_process_q, file_save_q):
         #   Yolo is done in grayscale so no point in doing RGB
         #   if we don't have too
 
-        if lifeforms_scan(item):
+        if lifeforms_scan(item,lifeforms):
             file_save_q.put((item, stamp))
             found_someone += 1
             if debug:
