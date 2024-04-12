@@ -348,7 +348,7 @@ def generate(yolo_process_q, lock):
     sensitivity = 0
     trigger = 0
 
-    webcam_file = jpeg_store + "testSnapshot.jpg"
+    webcam_file = jpeg_store + "testSnapshot" + "_lb" + str(node) + ".jpg"
 
     if high_def:
         width = 1920
@@ -522,11 +522,7 @@ def generate(yolo_process_q, lock):
     sys.exit(0)
 
 
-
-
-
-
-def lifeforms_scan(frame,lifeforms):
+def lifeforms_scan(frame, lifeforms):
     """
 
     Possible lifeforms this will detect are:
@@ -556,7 +552,7 @@ def lifeforms_scan(frame,lifeforms):
         print("found:", found)
         print("lifeforms found:", found_lifeforms)
 
-    return  found_lifeforms
+    return found_lifeforms
 
 
 #   Filename to log performance data
@@ -581,7 +577,6 @@ def analyse(yolo_process_q, file_save_q):
     found_someone = 0
 
     yolo.initialise_yolo()
-
 
     if performance_log_file == "":
         performance_log_file = (
@@ -611,7 +606,7 @@ def analyse(yolo_process_q, file_save_q):
         #   Yolo is done in grayscale so no point in doing RGB
         #   if we don't have too
 
-        if lifeforms_scan(item,lifeforms):
+        if lifeforms_scan(item, lifeforms):
             file_save_q.put((item, stamp))
             found_someone += 1
             if debug:
