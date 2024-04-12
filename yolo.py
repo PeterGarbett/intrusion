@@ -235,7 +235,7 @@ def main():
                 print("#", image_file, " ", list(allItems))
                 interesting.append(os.path.basename(image_file))
             else:
-                decomp = os.path.basename(image)
+                decomp = os.path.basename(image_file)
                 print("rm -f ", decomp)
 
     # Write back list of items with interesting objects found in them
