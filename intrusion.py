@@ -566,6 +566,7 @@ def lifeforms_scan(frame, lifeforms):
 
 #   Filename to log performance data
 
+
 performance_log_file = ""
 
 
@@ -615,8 +616,9 @@ def analyse(yolo_process_q, file_save_q):
         #   Yolo is done in grayscale so no point in doing RGB
         #   if we don't have too
 
-        if lifeforms_scan(item, lifeforms):
-            file_save_q.put((item, stamp))
+        discovered = lifeforms_scan(item, lifeforms)
+        if discovered:
+            file_save_q.put((item, stamp, discovered))
             found_someone += 1
             if debug:
                 print("Lifeforms exist!")
@@ -688,7 +690,10 @@ def preserve(file_save_q, lock):
 
     """
 
+    log_file = ""
+
     debug = False
+    output_reason_file_was_saved = True
 
     frame_count = 0
 
@@ -702,11 +707,25 @@ def preserve(file_save_q, lock):
             continue
 
         frame = cv.cvtColor(frame_and_stamp[0], cv.COLOR_BGR2RGB)
-        timestamp = frame_and_stamp[1]
         image = im.fromarray(frame)
+        timestamp = frame_and_stamp[1]
+        whats_in_image = frame_and_stamp[2]
 
-        if debug:
-            print("timestamp:", timestamp, "directory:", jpeg_store)
+        if output_reason_file_was_saved:
+
+            if log_file == "":
+                log_file = (
+                    jpeg_store
+                    + "log_file_"
+                    + filenames.time_stamped_filename()
+                    + ".txt"
+                )
+
+            try:
+                with open(log_file, "a+", encoding="ascii") as log:
+                    log.write(timestamp + " discovered " + str(whats_in_image) + "\n")
+            except Exception as err:
+                print(err)
 
         outname = filenames.image_name(
             number_pictures, jpeg_store, node, frame_count, timestamp, False
