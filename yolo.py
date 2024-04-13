@@ -176,7 +176,7 @@ animated = {
 
 
 def main():
-    """Test by using the routines on images in the current directory"""
+    """Test by using the routines on image files """
 
     #   Use specified base directory
     #   Should be writable so I can place a list
@@ -240,9 +240,19 @@ def main():
 
     # Write back list of items with interesting objects found in them
 
-    with open(baseDirectory + "interesting.txt", "w") as file:
-        file.write("\n".join(str(item) for item in interesting))
-        file.close()
+    try:
+        with open(baseDirectory + "interesting.txt", "w") as file:
+            file.write("\n".join(str(item) for item in interesting))
+            file.close()
+    except Exception as err:
+        print("#",err)
+        print("#Attempt to write file of interesting items locally\n")
+        try:
+            with open("./interesting.txt", "w") as file:
+                file.write("\n".join(str(item) for item in interesting))
+                file.close()
+        except Exception as err:
+            print(err)
 
 
 if __name__ == "__main__":
