@@ -153,6 +153,7 @@ def configure():
     global sshKeyLoc
     global lifeforms
     global video_source
+    global node
 
     debug = False
 
@@ -207,6 +208,14 @@ def configure():
         else:
             print("Illegal timestamp selection - defaulting to timestamping")
             number_pictures = False
+
+    ident_string = load_param(exl, "ident:")
+
+    try:
+        node = int(ident_string)
+    except:
+        print("Illegal value for system ident integer", ident_string)
+        sys.exit()
 
     trigger_string = load_param(exl, "motion_trigger_initial:")
 
