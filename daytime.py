@@ -1,15 +1,14 @@
-" If we want to make night time behaviour differ from daytime, we need to know " 
+from datetime import datetime
 from suntime import Sun, SunTimeException
 import pytz
 
 
-def daytime(latitude, longitude):
-    """Need to know if we have daylight"""
+def daytime(location):
 
-    now = datetime.datetime.utcnow()
+    latitude = location[0]
+    longitude =  location[1]
 
-# Fiddle to make times comparable
-
+    now = datetime.utcnow()
     utc = pytz.UTC
     now = utc.localize(now)
 
@@ -20,4 +19,10 @@ def daytime(latitude, longitude):
     today_sr = sun.get_sunrise_time()
     today_ss = sun.get_sunset_time()
 
-    return  today_sr < now and now < today_ss
+    if today_sr < now and now < today_ss:
+        return True
+    else:
+        return False
+
+
+
