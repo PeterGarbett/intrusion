@@ -8,4 +8,10 @@ pip install opencv-contrib-python-headless
 pip install pillow
 pip install paramiko
 pip install scp
+pip install pexpect
+pip install suntime
+pip install pytz
+
+
+
 
