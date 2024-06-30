@@ -81,6 +81,9 @@ import yolo
 import readfile_ignore_comments
 import filenames
 import manage_storage
+import daytime
+import crop
+
 
 node = 1
 version = 1.0
@@ -414,11 +417,22 @@ def generate(yolo_process_q, lock):
 
     first = True
 
+#
+#   Need to make these defined by the config file
+#
+
+    daycrop = (750, 750 + 640, 400, 400 + 480)
+    nightcrop = (450, 1400, 480, 980)
+    location = (52.4823, -1.898575)  # Birmingham UK
+
+    light = daytime.daytime(location)
+
     while True:
         # Read two images with a gap between to improve reliability of
         # motion detection. Should really be some sort of critical section
 
-        ret, frame1 = cap.read()
+        ret, frame = cap.read()
+        frame1 = crop.crop(frame, light, daycrop, nightcrop)
 
         #   Something like 10 percent of all the pixels
         #   Changed to be changed pixels. hopefully less dependent on brightness
@@ -438,7 +452,8 @@ def generate(yolo_process_q, lock):
 
         sleep(0.2)  # This might need changing or putting in config
 
-        ret, frame2 = cap.read()
+        ret, frame = cap.read()
+        frame2 = crop.crop(frame, light, daycrop, nightcrop)
 
         # if frame is read correctly ret is True
         if not ret:
@@ -492,6 +507,10 @@ def generate(yolo_process_q, lock):
 
             if debug:
                 print("Trigger value :", trigger, detected, rejected)
+        
+            # Dark or light ?
+
+            light = daytime.daytime(location)
 
         frame_count += 1
         frame_count = frame_count % FRAME_CYCLE

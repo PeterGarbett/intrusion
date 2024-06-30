@@ -8,8 +8,6 @@ nightcrop = (450, 1400, 480, 980)
 
 def crop(image, daylight, daycrop, nightcrop):
     ''' Crop image in a daylight dependent way '''
-    latitude = location[0]
-    longitude = location[1]
 
     size_x = image.shape[0]
     size_y = image.shape[1]
