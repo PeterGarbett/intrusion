@@ -389,11 +389,6 @@ def generate(yolo_process_q, lock):
 
     print("Unconditional periodic output on :", webcam_file)
 
-    #   Something like 10 percent of all the pixels
-    #   Changed to be changed pixels. hopefully less dependent on brightness
-
-    pixel_diff_threshold = 128 * width * height * sensitivityChange.value / 100
-
     upper_trigger_limit = sensitivity_upper.value
     lower_trigger_limit = sensitivity_lower.value
 
@@ -417,11 +412,22 @@ def generate(yolo_process_q, lock):
 
     # video frame capture loop
 
+    first = True
+
     while True:
         # Read two images with a gap between to improve reliability of
         # motion detection. Should really be some sort of critical section
 
         ret, frame1 = cap.read()
+
+        #   Something like 10 percent of all the pixels
+        #   Changed to be changed pixels. hopefully less dependent on brightness
+
+        if first:
+            pixel_diff_threshold = (
+                128 * frame1.shape[0] * frame1.shape[1] * trigger / 100
+            )
+            first = False
 
         # if frame is read correctly ret is True
         if not ret:
@@ -476,7 +482,12 @@ def generate(yolo_process_q, lock):
             if debug:
                 print("trigger:", trigger)
 
-            pixel_diff_threshold = 128 * width * height * trigger / 100
+            # Recalculate pixel threshold on changed trigger
+
+            pixel_diff_threshold = (
+                128 * frame1.shape[0] * frame1.shape[1] * trigger / 100
+            )
+
             sensitivityChange.value = trigger
 
             if debug:
