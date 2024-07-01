@@ -417,16 +417,18 @@ def generate(yolo_process_q, lock):
 
     first = True
 
-#
-#   Need to make these defined by the config file
-#
+    #
+    #   Need to make these defined by the config file
+    #
 
-    daycrop = (750, 750 + 640, 400, 400 + 480)
+    daycrop = None  # (750, 750 + 640, 400, 400 + 480)
     nightcrop = (450, 1400, 480, 980)
     location = (52.4823, -1.898575)  # Birmingham UK
     trigger = sensitivityChange.value
 
     light = daytime.daytime(location)
+
+    fgbg = cv.bgsegm.createBackgroundSubtractorMOG()
 
     while True:
         # Read two images with a gap between to improve reliability of
@@ -508,7 +510,7 @@ def generate(yolo_process_q, lock):
 
             if debug:
                 print("Trigger value :", trigger, detected, rejected)
-        
+
             # Dark or light ?
 
             light = daytime.daytime(location)
@@ -524,7 +526,8 @@ def generate(yolo_process_q, lock):
         gray1 = cv.cvtColor(frame1, cv.COLOR_BGR2GRAY)
         gray2 = cv.cvtColor(frame2, cv.COLOR_BGR2GRAY)
 
-        difference = cv.absdiff(gray1, gray2)
+        # difference = cv.absdiff(gray1, gray2)
+        difference = fgbg.apply(gray2)
         # Calculate changed pixels with account taken for their change in value
         num_diff = np.sum(difference)
 
