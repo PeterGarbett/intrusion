@@ -96,7 +96,7 @@ high_def = None
 jpeg_store = ""
 
 SuppressDeletion = False  # True     # Dry run for test purposes
-LocalSizeLimit = 1 * 2 ** 30  # bytes required free
+LocalSizeLimit = 1 * 2**30  # bytes required free
 number_pictures = False  # Good for debugging, as an alternative to timestamps
 
 # Remote filestore
@@ -746,7 +746,6 @@ def preserve(file_save_q, lock):
         whats_in_image = frame_and_stamp[2]
 
         if output_reason_file_was_saved:
-
             if log_file == "":
                 log_file = (
                     jpeg_store
@@ -850,12 +849,18 @@ def re_transmit(lock):
         if 0 == len(candidates):
             lock.release()
             continue
+        if debug:
+            print("Candidates to resend", candidates)
+
         outname = candidates[0]
 
         if debug:
-            print("re_transmit:", outname)
+            print("Attempt to re_transmit:", outname)
 
         scp_status = send_file(outname)
+        if debug:
+            print("Attempt to re_transmit:", outname, " status ",scp_status)
+
 
         #   If we succeed then rename the file as local... implying it also exists remotely
 
@@ -865,10 +870,14 @@ def re_transmit(lock):
             )
 
             if newname != "":
-                os.rename(outname, newname)
-                os.system("touch " + newname)  # if inotify is watching prod it
-                if debug:
-                    print("File renamed from", outname, " to ", newname)
+                try:
+                    os.rename(outname, newname)
+                    os.system("touch " + newname)  # if inotify is watching prod it
+                    if debug:
+                        print("File renamed from", outname, " to ", newname)
+                except Exception as err:
+                    print(err)
+
             lock.release()
         else:
             lock.release()
@@ -998,7 +1007,6 @@ def main():
     framesBeingProcessed.value = 0
 
     while True:
-
         # Check children are all (nominally) active
 
         child_count = 0
