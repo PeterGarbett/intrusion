@@ -35,10 +35,14 @@ def yolo_analysis(image):
     """use yolo on an image"""
     global net
 
+    # Protect from null arguments
+
+    if image.any() == None:
+        return []
+
     output_result_image = False
 
     def get_output_layers(net):
-
         layer_names = net.getLayerNames()
         try:
             output_layers = [layer_names[i - 1] for i in net.getUnconnectedOutLayers()]
@@ -50,7 +54,6 @@ def yolo_analysis(image):
         return output_layers
 
     def draw_prediction(img, class_id, confidence, x, y, x_plus_w, y_plus_h):
-
         label = str(classes[class_id])
         color = COLORS[class_id]
 
@@ -100,7 +103,6 @@ def yolo_analysis(image):
     types = list(set(things))
 
     if output_result_image:
-
         for i in indices:
             try:
                 box = boxes[i]
@@ -130,6 +132,7 @@ def yolo_analysis(image):
 
 def yolo_image(image):
     """Use yolo on an image and return what is found"""
+
     items = yolo_analysis(image)
     return items
 
@@ -176,7 +179,7 @@ animated = {
 
 
 def main():
-    """Test by using the routines on image files """
+    """Test by using the routines on image files"""
 
     #   Use specified base directory
     #   Should be writable so I can place a list
@@ -245,7 +248,7 @@ def main():
             file.write("\n".join(str(item) for item in interesting))
             file.close()
     except Exception as err:
-        print("#",err)
+        print("#", err)
         print("#Attempt to write file of interesting items locally\n")
         try:
             with open("./interesting.txt", "w") as file:
