@@ -705,7 +705,7 @@ def send_file(filename):
             print("scp file")
         client = paramiko.SSHClient()
         client.load_system_host_keys()
-        client.connect(hostname, username=user)
+        client.connect(hostname, username=user,timeout=340)
         with SCPClient(client.get_transport()) as scp:
             scp.put(filename, remote_path=path)
     except Exception as err:
