@@ -35,7 +35,8 @@ def yolo_analysis(image):
     """use yolo on an image"""
     global net
 
-    # Protect from null arguments
+    if type(image) == type(None):
+        return []
 
     if image.any() == None:
         return []
