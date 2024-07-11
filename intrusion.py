@@ -83,7 +83,7 @@ import filenames
 import manage_storage
 import daytime
 import crop
-
+import trigger_external
 
 node = 1
 version = 1.0
@@ -117,7 +117,7 @@ frameDelay = 3
 
 window = 0.25  # analysis polling rate limiter
 window2 = 0.1  # filestore management polling rate limiter
-window3 = 60  # re_transmit polling rate
+window3 = 6  # re_transmit polling rate
 
 
 video_source = ""
@@ -467,8 +467,11 @@ def generate(yolo_process_q, lock):
 
         if frame_count == 0:  # Only check on this at a slowish rate
             directly_save_image(webcam_file, frame1, lock)
+            if 0 == detected:
+                trigger_external.low_event_count()
 
         #   Periodically assess effectiveness of trigger level
+        #   at a sub-period of the frame rate
 
         if frame_count != 0 and 0 == frame_count % ((FRAME_CYCLE / 8) - 1):
             power_ratio = detected / (detected + rejected)
@@ -544,6 +547,10 @@ def generate(yolo_process_q, lock):
             timestamp = filenames.time_stamped_filename()
             qitem = (frame2, timestamp)
             yolo_process_q.put(qitem)
+
+            # Trigger optional external actions
+
+            trigger_external.motion_detected(light)
             directly_save_image(
                 webcam_file, frame2, lock
             )  # Keep live image recent when changes occur
@@ -653,6 +660,7 @@ def analyse(yolo_process_q, file_save_q):
         discovered = lifeforms_scan(item, lifeforms)
         if discovered:
             file_save_q.put((item, stamp, discovered))
+            trigger_external.person_detected()
             found_someone += 1
             if debug:
                 print("Lifeforms exist!")
@@ -702,18 +710,29 @@ def send_file(filename):
 
     try:
         if debug:
-            print("scp file")
+            print("scp file", filename)
         client = paramiko.SSHClient()
         client.load_system_host_keys()
-        client.connect(hostname, username=user,timeout=340)
+        client.connect(hostname, username=user, timeout=60)
+    except Exception as err:
+        print(err)
+        if debug:
+            print("Failed to connect to remore host")
+        scp.close()
+        return False
+
+    try:
         with SCPClient(client.get_transport()) as scp:
             scp.put(filename, remote_path=path)
     except Exception as err:
+        print(err)
         if debug:
-            print("Failed to save file to remote", err)
-        sent = False
+            print("Failed to save ", filename, " to remote")
+        scp.close()
+        return False
 
-    return sent
+    scp.close()
+    return True
 
 
 def preserve(file_save_q, lock):
@@ -810,7 +829,7 @@ def re_transmit(lock):
     working 1st
     """
 
-    debug = False
+    debug = True
 
     while True:
         retransmissionActive.value += 1  # Watchdog
@@ -822,7 +841,7 @@ def re_transmit(lock):
 
         if response != 0:
             if debug:
-                print("No internet connection")
+                print("File transmission not possible, no internet connection")
             continue
 
         acq = lock.acquire(block=False)
@@ -850,17 +869,22 @@ def re_transmit(lock):
             lock.release()
             continue
         if debug:
-            print("Candidates to resend", candidates)
+            print("There are ", len(candidates), " files to transmit")
 
         outname = candidates[0]
 
         if debug:
-            print("Attempt to re_transmit:", outname)
+            print("Attempt to transmit:", outname)
+
+        retransmissionActive.value += 1  # Watchdog
 
         scp_status = send_file(outname)
-        if debug:
-            print("Attempt to re_transmit:", outname, " status ",scp_status)
 
+        #       send_file may take a while, ensure despite this we are known to be active
+
+        retransmissionActive.value += 1  # Watchdog
+        if debug:
+            print("Attempt to re_transmit:", outname, " status ", scp_status)
 
         #   If we succeed then rename the file as local... implying it also exists remotely
 
@@ -877,14 +901,15 @@ def re_transmit(lock):
                         print("File renamed from", outname, " to ", newname)
                 except Exception as err:
                     print(err)
+            else:
+                print("Rename failed for file", outname)
 
             lock.release()
         else:
+            retransmissionActive.value += 1  # Watchdog
             lock.release()
-            retransmissionActive.value += 1  # Watchdog
-            sleep(FRAME_CYCLE / 2)
-            retransmissionActive.value += 1  # Watchdog
-            sleep(FRAME_CYCLE / 2)
+            if debug:
+                print("re_transmit failed ")
 
 
 #
@@ -936,6 +961,8 @@ def main():
     """setup processes, start and monitor them"""
 
     configure()
+
+    trigger_external.initialise_trigger()
 
     #   Configuration complete. Now start
 
@@ -1030,7 +1057,7 @@ def main():
 
         #       In fact check everything at quite a slow rate
 
-        sleep(10 * window3 + 1)  # Wait for processes to increment it, if active
+        sleep(11 * window3 + 1)  # Wait for processes to increment it, if active
 
         if debug:
             print("loop count for generate:", framesBeingProcessed.value)
@@ -1050,7 +1077,7 @@ def main():
             print("loop count for frame generate:", framesBeingProcessed.value)
             print("loop count for yolo analysis:", yoloAnalysisActive.value)
             print("loop count for filestore handling:", filestoreActive.value)
-            print("loop count for reTramission activity:", retransmissionActive.value)
+            print("loop count for reTransmission activity:", retransmissionActive.value)
 
             for process in multiprocessing.active_children():
                 process.terminate()
