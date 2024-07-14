@@ -84,6 +84,7 @@ import manage_storage
 import daytime
 import crop
 import trigger_external
+import transfer
 
 node = 1
 version = 1.0
@@ -335,7 +336,7 @@ def directly_save_image(webcam_file, frame, lock):
             image.save(webcam_file)
 
             # Send elsewhere
-            send_file(webcam_file, user, hostname, path)
+            transfer.send_file(webcam_file, user, hostname, path)
 
             # Record when
 
@@ -694,44 +695,6 @@ def analyse(yolo_process_q, file_save_q):
             except Exception as err:
                 print(err)
 
-def send_file (filename, user, hostname, path):
-    """
-
-    Send image to somewhere non-local using scp
-    This could be anywhere on the internet
-
-    """
-
-    debug = False
-
-    sent = True
-
-    try:
-        if debug:
-            print("scp file", filename)
-        client = paramiko.SSHClient()
-        client.load_system_host_keys()
-        client.connect(hostname, username=user, timeout=60)
-    except Exception as err:
-        print(err)
-        if debug:
-            print("Failed to connect to remore host")
-        scp.close()
-        return False
-
-    try:
-        with SCPClient(client.get_transport()) as scp:
-            scp.put(filename, remote_path=path)
-    except Exception as err:
-        print(err)
-        if debug:
-            print("Failed to save ", filename, " to remote")
-        scp.close()
-        return False
-
-    scp.close()
-    return True
-
 
 def preserve(file_save_q, lock):
     """
@@ -791,7 +754,7 @@ def preserve(file_save_q, lock):
 
         #   Try to send over the internet
 
-        scp_status = send_file(outname, user, hostname, path)
+        scp_status = transfer.send_file(outname, user, hostname, path)
 
         #   If we succeed then rename the file as local... implying it also exists remotely
         #   This means we can easily identify what hasn't been sent ...  to retry later
@@ -875,7 +838,7 @@ def re_transmit(lock):
             print("Attempt to transmit:", outname)
 
         retransmissionActive.value += 1  # Watchdog
-        scp_status = send_file(outname, user, hostname, path)
+        scp_status = transfer.send_file(outname, user, hostname, path)
 
         #       send_file may take a while, ensure despite this we are known to be active
 
