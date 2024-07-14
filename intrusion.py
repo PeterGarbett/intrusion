@@ -335,8 +335,7 @@ def directly_save_image(webcam_file, frame, lock):
             image.save(webcam_file)
 
             # Send elsewhere
-
-            send_file(webcam_file)
+            send_file(webcam_file, user, hostname, path)
 
             # Record when
 
@@ -695,8 +694,7 @@ def analyse(yolo_process_q, file_save_q):
             except Exception as err:
                 print(err)
 
-
-def send_file(filename):
+def send_file (filename, user, hostname, path):
     """
 
     Send image to somewhere non-local using scp
@@ -793,7 +791,7 @@ def preserve(file_save_q, lock):
 
         #   Try to send over the internet
 
-        scp_status = send_file(outname)
+        scp_status = send_file(outname, user, hostname, path)
 
         #   If we succeed then rename the file as local... implying it also exists remotely
         #   This means we can easily identify what hasn't been sent ...  to retry later
@@ -877,8 +875,7 @@ def re_transmit(lock):
             print("Attempt to transmit:", outname)
 
         retransmissionActive.value += 1  # Watchdog
-
-        scp_status = send_file(outname)
+        scp_status = send_file(outname, user, hostname, path)
 
         #       send_file may take a while, ensure despite this we are known to be active
 
