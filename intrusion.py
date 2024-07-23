@@ -455,8 +455,6 @@ def generate(yolo_process_q, lock):
 
         sleep(0.2)  # This might need changing or putting in config
 
-        ret, frame = cap.read()
-        frame2 = crop.crop(frame, light, daycrop, nightcrop)
 
         # if frame is read correctly ret is True
         if not ret:
@@ -527,11 +525,9 @@ def generate(yolo_process_q, lock):
             print("framesBeingProcessed set:", framesBeingProcessed.value)
 
         gray1 = cv.cvtColor(frame1, cv.COLOR_BGR2GRAY)
-        gray2 = cv.cvtColor(frame2, cv.COLOR_BGR2GRAY)
 
-        # difference = cv.absdiff(gray1, gray2)
-        difference = fgbg.apply(gray2)
-        # Calculate changed pixels with account taken for their change in value
+        difference = fgbg.apply(gray1)
+        # Calculate 'size' of foreground with account taken for their change in value
         num_diff = np.sum(difference)
 
         if debug:
@@ -545,14 +541,14 @@ def generate(yolo_process_q, lock):
 
         if pixel_diff_threshold < abs(num_diff):
             timestamp = filenames.time_stamped_filename()
-            qitem = (frame2, timestamp)
+            qitem = (frame1, timestamp)
             yolo_process_q.put(qitem)
 
             # Trigger optional external actions
 
             trigger_external.motion_detected(light)
             directly_save_image(
-                webcam_file, frame2, lock
+                webcam_file, frame1, lock
             )  # Keep live image recent when changes occur
             if debug:
                 print("Motion detected, pushed frame", frame_count)
