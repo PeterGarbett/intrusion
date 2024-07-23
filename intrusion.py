@@ -422,7 +422,7 @@ def generate(yolo_process_q, lock):
     #
 
     daycrop = None  # (750, 750 + 640, 400, 400 + 480)
-    nightcrop = (450, 1400, 480, 980)
+    nightcrop = None # (450, 1400, 480, 980)
     location = (52.4823, -1.898575)  # Birmingham UK
     trigger = sensitivityChange.value
 
