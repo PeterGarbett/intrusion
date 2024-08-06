@@ -1,7 +1,7 @@
 #!/bin/bash
 
 echo "Check filesystem"
-fsck -t exfat -y /dev/sda1
+fsck -t vfat -y /dev/sda1
 
 echo "Mount /exdrive"
-mount -t exfat /dev/sda1  /exdrive/ -o uid=embed -o gid=embed
+mount  /dev/sda1  /exdrive/ -o uid=embed -o gid=embed
