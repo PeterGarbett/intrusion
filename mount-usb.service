@@ -6,7 +6,8 @@ Description=mount-usb stick
 
 [Service]
 Type=oneshot
-ExecStart=/usr/local/bin/mount-usb
+RemainAfterExit=true
+ExecStart=sudo /usr/local/bin/mount-usb
 
 [Install]
 WantedBy=multi-user.target
