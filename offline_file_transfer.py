@@ -1,4 +1,3 @@
-""" Separated out file transfer utility """
 import sys
 import glob
 import os
@@ -11,7 +10,7 @@ import transfer
 retransmissionActive = multiprocessing.Value("i", 0)
 window3 = 67
 jpeg_store = "/exdrive/Snapshots/Local/"
-hostname = "garbett.cloudns.org"
+hostname = "<your_url>"
 remote_path = "/exdrive/Snapshots/Local/"
 user = "embed"
 
@@ -19,7 +18,7 @@ user = "embed"
 number_pictures = False
 
 
-def re_transmit(lock, user, hostname, final_dest, remote_path):
+def re_transmit(pattern, lock, user, hostname, final_dest, remote_path):
     """
     re_transmit - which is in fact a misnomer it's more like retry
     transferring something that didn't go the first time.
@@ -58,7 +57,7 @@ def re_transmit(lock, user, hostname, final_dest, remote_path):
         # get candidate image files (excluding live)
         # This only works well with timestamped files
 
-        imgnames = sorted(glob.glob(jpeg_store + "2*lb%.jpg"))
+        imgnames = sorted(glob.glob(jpeg_store + pattern))
 
         if len(imgnames) == 0:
             lock.release()
@@ -77,6 +76,8 @@ def re_transmit(lock, user, hostname, final_dest, remote_path):
             continue
         if debug:
             print("There are ", len(candidates), " files to transmit")
+
+        #   Start at the opposite end from main program intrusion.py
 
         outname = candidates[-1]
 
@@ -119,9 +120,9 @@ def re_transmit(lock, user, hostname, final_dest, remote_path):
                 print("re_transmit failed ")
 
 
-def send(user, hostname, final_dest, remote_path):
+def send(pattern, user, hostname, final_dest, remote_path):
     filestore_lock = multiprocessing.Lock()
-    re_transmit(filestore_lock, user, hostname, final_dest, remote_path)
+    re_transmit(pattern, filestore_lock, user, hostname, final_dest, remote_path)
 
 
 if __name__ == "__main__":
@@ -135,9 +136,15 @@ if __name__ == "__main__":
         )
         sys.exit()
 
+#    Just external camera files for now 
+
+    pattern = "2*lb4.jpg"
+
     if len(inputargs) == 4:
         user = inputargs[0]
         hostname = inputargs[1]
         final_dest = inputargs[2]
         remote_path = inputargs[3]
-        send(user, hostname, final_dest, remote_path)
+        send(pattern, user, hostname, final_dest, remote_path)
+
+
