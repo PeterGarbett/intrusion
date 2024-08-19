@@ -1,7 +1,12 @@
 #!/bin/bash
 
-echo "Check filesystem"
-fsck -t vfat -y /dev/sda1
 
+echo "Check filesystem"
+fsck -t ext4 -y /dev/sda1
 echo "Mount /exdrive"
-mount  /dev/sda1  /exdrive/ -o uid=embed -o gid=embed
+mount -t ext4 /dev/sda1  /exdrive/ 
+echo "Change ownership"
+chown -R embed:embed /exdrive
+
+
+
