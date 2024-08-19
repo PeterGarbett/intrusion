@@ -7,7 +7,7 @@ exit
 
 echo "Clean up space before depowering"
 
-#/home/embed/EOS/bin/python3 /home/embed/EOS/clear-space.py 
+/home/embed/EOS/clear.sh
 
 echo "Power down external camera - release lock  "
 
