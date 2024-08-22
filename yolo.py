@@ -31,12 +31,13 @@ def initialise_yolo():
     net = cv2.dnn.readNet(weights, config)
 
 
-def yolo_analysis(image):
+def yolo_analysis(image,modify=False):
     """use yolo on an image"""
     global net
 
     if type(image) == type(None):
         return []
+
 
     if image.any() == None:
         return []
@@ -103,7 +104,7 @@ def yolo_analysis(image):
         things.append(classes[class_ids[i]])
     types = list(set(things))
 
-    if output_result_image:
+    if modify:
         for i in indices:
             try:
                 box = boxes[i]
@@ -125,23 +126,23 @@ def yolo_analysis(image):
                 round(y + h),
             )
 
-        cv2.imwrite("object-detection.jpg", image)
-        cv2.destroyAllWindows()
 
     return types
 
 
-def yolo_image(image):
+def yolo_image(image,modify=False):
     """Use yolo on an image and return what is found"""
 
-    items = yolo_analysis(image)
+    items = yolo_analysis(image,modify)
     return items
 
 
-def yolo_file(file_name):
+def yolo_file(file_name,modify=False):
     """Use yolo on an image file and return what is found"""
     image = cv2.imread(file_name)
-    items = yolo_analysis(image)
+    items = yolo_analysis(image,modify)
+    if modify and items:
+        cv2.imwrite(file_name, image)
 
     return items
 
