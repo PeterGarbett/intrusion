@@ -183,6 +183,8 @@ animated = {
 def main():
     """Test by using the routines on image files"""
 
+    lifeforms ={"person","bear","bird","cat", "cow","dog","elephant","giraffe", "horse", "sheep","zebra"}
+
     #   Use specified base directory
     #   Should be writable so I can place a list
     #   of analysed items into it
@@ -233,8 +235,10 @@ def main():
     for image_file in imgnames:
         decomp = os.path.basename(image_file)
         if decomp not in interesting:
-            image = cv2.imread(image_file)
-            found = intrusion.lifeforms_scan(image, animated)
+
+            raw_found = set(yolo.yolo_file(image_file,True))
+            found= raw_found & lifeforms
+
             if found:
                 allItems = set(found).union(allItems)
                 print("#", image_file, " ", list(allItems))
