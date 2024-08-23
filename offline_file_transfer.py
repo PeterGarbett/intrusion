@@ -10,7 +10,7 @@ import transfer
 retransmissionActive = multiprocessing.Value("i", 0)
 window3 = 67
 jpeg_store = "/exdrive/Snapshots/Local/"
-hostname = "<your_url>"
+hostname = "garbett.cloudns.org"
 remote_path = "/exdrive/Snapshots/Local/"
 user = "embed"
 
@@ -75,7 +75,10 @@ def re_transmit(pattern, lock, user, hostname, final_dest, remote_path):
             sleep(60)
             continue
         if debug:
-            print("There are ", len(candidates), " files to transmit")
+            if len(candidates) == 1:
+                print("There is ", len(candidates), " file to transmit")
+            else:
+                print("There are ", len(candidates), " files to transmit")
 
         #   Start at the opposite end from main program intrusion.py
 
@@ -136,9 +139,7 @@ if __name__ == "__main__":
         )
         sys.exit()
 
-#    Just external camera files for now 
-
-    pattern = "2*lb4.jpg"
+    pattern = "2*lb*.jpg"
 
     if len(inputargs) == 4:
         user = inputargs[0]
@@ -146,5 +147,3 @@ if __name__ == "__main__":
         final_dest = inputargs[2]
         remote_path = inputargs[3]
         send(pattern, user, hostname, final_dest, remote_path)
-
-
