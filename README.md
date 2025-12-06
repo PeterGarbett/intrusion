@@ -23,8 +23,12 @@ rather than camera input should work for a lot of cases.
 
 Installation notes:
 
-I currently run this under my user account which some may 
-think is a tad unproffesional.  Should be easy enough to change.
+I currently run this under a system account named embed.
+
+python3.14 breaks the code, probably related to shared data when
+multithreading.
+
+I have changed setup-virt to select python3.12 to avoid this problem for now.
 
 set runlevel to 3 via the command.
 sudo systemctl set-default target multi-user.target
