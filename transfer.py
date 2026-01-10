@@ -1,5 +1,6 @@
-""" Transfer files using scp via a subprocess rather than paramiko,
-the overwhelming advantage being it is relable """
+"""Transfer files using scp via a subprocess rather than paramiko,
+the overwhelming advantage being it is reliable"""
+
 import subprocess
 
 TIMEOUT = 120
@@ -28,5 +29,8 @@ def send_file(filename, user, hostname, remote_path):
 
     scp_command = ["/usr/bin/scp", filename, user + "@" + hostname + ":" + remote_path]
 
-    return command(scp_command)
+    print("attempt to send", filename, "command=", scp_command)
 
+    retcode = command(scp_command)
+
+    return retcode
