@@ -165,7 +165,7 @@ def configure():
 
     config_filename = "intrusion.conf"
     config_location = "/exdrive/Snapshots/"
-    config_location2 = "/etc/intrusion/"
+    config_location2 = "/etc/"
 
     #   It is important to select no change of case here since some data are file locations
 
