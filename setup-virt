@@ -1,11 +1,11 @@
 #
 #
 #
-virtualenv  --python "/usr/bin/python3.12"  .
+virtualenv    .
 source ./bin/activate
 pip install --upgrade pip
-pip install numpy
-pip install opencv-contrib-python-headless
+pip install "numpy<2.0"
+pip install "opencv-contrib-python-headless<5.0"
 pip install pillow
 pip install paramiko
 pip install scp
