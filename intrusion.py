@@ -794,7 +794,8 @@ def re_transmit(lock):
         retransmissionActive.value += 1  # Watchdog
 
         test_hostname = "google.com"  # example
-        response = os.system("ping -c 1 -w2 " + test_hostname + " > /dev/null 2>&1")
+        #response = os.system("ping -c 1 -w2 " + test_hostname + " > /dev/null 2>&1")
+        response = os.system("fping " + test_hostname + " > /dev/null 2>&1")
 
         if response != 0:
             if debug:
