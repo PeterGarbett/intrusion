@@ -79,5 +79,13 @@ https://github.com/arunponnusamy/object-detection-opencv.git
 and are described on
 https://towardsdatascience.com/yolo-object-detection-with-opencv-and-python-21e50ac599e9
  
+Notes:
 
+CPU / software incompatibility
+
+New from numpy, the great leap backward from ./configure,make,make install
+they just bung you an incompatible binary.
+
+Incorporated fix in setup-virt-aged-cpu
+ 
 

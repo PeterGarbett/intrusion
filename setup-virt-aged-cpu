@@ -1,0 +1,18 @@
+#
+#
+#
+virtualenv    .
+source ./bin/activate
+pip install --upgrade pip
+pip install --no-binary numpy  numpy -Csetup-args=-Dcpu-baseline=none   
+pip install "opencv-contrib-python-headless<5.0"
+pip install pillow
+pip install paramiko
+pip install scp
+pip install pexpect
+pip install suntime
+pip install pytz
+
+
+
+
