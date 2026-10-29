@@ -89,3 +89,15 @@ they just bung you an incompatible binary.
 Incorporated fix in setup-virt-aged-cpu
  
 
+Move from yolo v3 to yolo26, which also means I can move to latest opencv.
+Downsides, downloading ultralytics is big and links have to be high speed
+and error free.  Also torch uses cpu extensions which may not be available.
+Searching for a work around.
+
+yolo26 models should be downloaded and explicity pointed to, for example
+/opt/yolo/yolo26n.pt
+
+
+
+
+
