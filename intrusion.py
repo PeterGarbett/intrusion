@@ -428,7 +428,7 @@ def generate(yolo_process_q, lock):
 
     light = daytime.daytime(location)
 
-    fgbg = cv.bgsegm.createBackgroundSubtractorMOG()
+    fgbg = cv.createBackgroundSubtractorMOG2()
 
     while True:
         # Read two images with a gap between to improve reliability of

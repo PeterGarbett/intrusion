@@ -4,8 +4,8 @@
 virtualenv    .
 source ./bin/activate
 pip install --upgrade pip
-pip install "numpy<2.0"
-pip install "opencv-contrib-python-headless<5.0"
+pip install numpy
+pip install opencv-contrib-python-headless
 pip install pillow
 pip install paramiko
 pip install scp
@@ -13,6 +13,4 @@ pip install pexpect
 pip install suntime
 pip install pytz
 
-
-
-
+pip install ultralytics

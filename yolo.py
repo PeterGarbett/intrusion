@@ -1,151 +1,72 @@
-"""
+"""Interface to yolo26"""
 
-#############################################
-# Object detection - YOLO - OpenCV
-# Author : Arun Ponnusamy   (July 16, 2018)
-# Website : http://www.arunponnusamy.com
-############################################
-
-Hacked to interface to intrusion.py
-
-"""
-
-import cv2
-import numpy as np
 import glob
-
-config = "/etc/opt/yolo/yolov3.cfg"
-weights = "/etc/opt/yolo/yolov3.weights"
-classes_file = "/etc/opt/yolo/yolov3.txt"
-
-
-def initialise_yolo():
-    """Separate out the file reading aspects to a once only read"""
-    global classes
-    global COLORS
-    global net
-
-    with open(classes_file, "r") as f:
-        classes = [line.strip() for line in f.readlines()]
-    COLORS = np.random.uniform(0, 255, size=(len(classes), 3))
-    net = cv2.dnn.readNet(weights, config)
+import os
+import sys
+import time
+import cv2
+from ultralytics import YOLO
 
 
-def yolo_analysis(image,modify=False):
-    """use yolo on an image"""
-    global net
-
-    if type(image) == type(None):
-        return []
+def initialise_yolo(version="/opt/yolo/yolo26n.pt"):
+    """Setup what model to use"""
+    global model
+    model = YOLO(version)  # load an official model
 
 
-    if image.any() == None:
-        return []
-
-    output_result_image = False
-
-    def get_output_layers(net):
-        layer_names = net.getLayerNames()
-        try:
-            output_layers = [layer_names[i - 1] for i in net.getUnconnectedOutLayers()]
-        except:
-            output_layers = [
-                layer_names[i[0] - 1] for i in net.getUnconnectedOutLayers()
-            ]
-
-        return output_layers
-
-    def draw_prediction(img, class_id, confidence, x, y, x_plus_w, y_plus_h):
-        label = str(classes[class_id])
-        color = COLORS[class_id]
-
-        cv2.rectangle(img, (x, y), (x_plus_w, y_plus_h), color, 2)
-
-        cv2.putText(
-            img, label, (x - 10, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2
-        )
-
-    Width = image.shape[1]
-    Height = image.shape[0]
-    scale = 0.00392
-
-    blob = cv2.dnn.blobFromImage(image, scale, (416, 416), (0, 0, 0), True, crop=False)
-
-    net.setInput(blob)
-
-    outs = net.forward(get_output_layers(net))
-
-    class_ids = []
-    confidences = []
-    boxes = []
-    conf_threshold = 0.5
-    nms_threshold = 0.4
-
-    for out in outs:
-        for detection in out:
-            scores = detection[5:]
-            class_id = np.argmax(scores)
-            confidence = scores[class_id]
-            if confidence > 0.5:
-                center_x = int(detection[0] * Width)
-                center_y = int(detection[1] * Height)
-                w = int(detection[2] * Width)
-                h = int(detection[3] * Height)
-                x = center_x - w / 2
-                y = center_y - h / 2
-                class_ids.append(class_id)
-                confidences.append(float(confidence))
-                boxes.append([x, y, w, h])
-
-    indices = cv2.dnn.NMSBoxes(boxes, confidences, conf_threshold, nms_threshold)
-
-    things = []
-    for i in indices:
-        things.append(classes[class_ids[i]])
-    types = list(set(things))
-
-    if modify:
-        for i in indices:
-            try:
-                box = boxes[i]
-            except:
-                i = i[0]
-                box = boxes[i]
-
-            x = box[0]
-            y = box[1]
-            w = box[2]
-            h = box[3]
-            draw_prediction(
-                image,
-                class_ids[i],
-                confidences[i],
-                round(x),
-                round(y),
-                round(x + w),
-                round(y + h),
-            )
-
-
-    return types
-
-
-def yolo_image(image,modify=False):
+def yolo_image_internal(image, threshold=0.8):
     """Use yolo on an image and return what is found"""
+    global model
 
-    items = yolo_analysis(image,modify)
-    return items
+    # Predict with the model
+    results = model(image, verbose=False)
+    # Access the results (in fact should only be one)
+    result = results[0]
+
+    # For reference, this is how to extract these values...
+    # but will be flgged as unused.
+
+    #    xywh = result.boxes.xywh  # center-x, center-y, width, height
+    #    xywhn = result.boxes.xywhn  # normalized
+    #    xyxy = result.boxes.xyxy  # top-left-x, top-left-y, bottom-right-x, bottom-right-y
+    #    xyxyn = result.boxes.xyxyn  # normalized
+
+    names = [
+        result.names[cls.item()] for cls in result.boxes.cls.int()
+    ]  # class name of each box
+
+    confs = result.boxes.conf  # confidence score of each box
+
+    found = []
+
+    for index, name in enumerate(names):
+        if "person" == name:
+            if threshold < confs[index].item():
+                found.append(name)
+        else:
+            found.append(name)
+
+    return (found, result)
 
 
-def yolo_file(file_name,modify=False):
+def yolo_file(file_name, modify=True, threshold=0.0):
     """Use yolo on an image file and return what is found"""
+
     image = cv2.imread(file_name)
-    items = yolo_analysis(image,modify)
+    start =time.perf_counter()
+    (items, result) = yolo_image_internal(image, threshold)
+    end =time.perf_counter()
+    print(end-start)
+
     if modify and items:
-        cv2.imwrite(file_name, image)
+        result.plot()
+        result.save(filename=file_name)
 
     return items
 
+def yolo_image(image, threshold=0.8):
+    (items, result) = yolo_image_internal(image, threshold)
+    return items
 
 #
 #   motion is lightweight but prone to false positives.
@@ -154,26 +75,6 @@ def yolo_file(file_name,modify=False):
 #   The view here allways has cars in it. Your situation may well differ
 #
 
-import yolo
-import glob
-import os
-import sys
-import intrusion
-import cv2
-
-animated = {
-    "person",
-    "bear",
-    "bird",
-    "cat",
-    "cow",
-    "dog",
-    "elephant",
-    "giraffe",
-    "horse",
-    "sheep",
-    "zebra",
-}
 
 #
 # Detect whats in the image using yolo
@@ -183,26 +84,36 @@ animated = {
 def main():
     """Test by using the routines on image files"""
 
-    lifeforms ={"person","bear","bird","cat", "cow","dog","elephant","giraffe", "horse", "sheep","zebra"}
+    lifeforms = {
+        "person",
+        "bear",
+        "bird",
+        "cat",
+        "cow",
+        "dog",
+        "elephant",
+        "giraffe",
+        "horse",
+        "sheep",
+        "zebra",
+    }
 
     #   Use specified base directory
     #   Should be writable so I can place a list
     #   of analysed items into it
-    #   Defaults to "" which means the current directory
+    #   Defaults to  which means the current directory
 
     inputargs = sys.argv
-    sys.argv.pop(0)
+    if inputargs:
+        inputargs.pop(0)
 
-    if len(inputargs) == 0:
-        baseDirectory = ""
+    if len(inputargs) != 1:
+        print("badly specified base directory, exiting")
+        sys.exit()
     else:
-        if len(inputargs) != 1:
-            print("badly specified base directory, exiting")
-            exit()
-        else:
-            baseDirectory = inputargs[0]
+        base_directory = inputargs[0]
 
-    yolo.initialise_yolo()
+    initialise_yolo()
 
     #   Output the script header
 
@@ -210,7 +121,7 @@ def main():
     print("#")
     print("#\tScript to remove boring images")
     print("#")
-    print("#\tBase directory:", baseDirectory)
+    print("#\tBase directory:", base_directory)
     print("#")
 
     #   Pull out the previous results. This is important because yolo
@@ -219,7 +130,7 @@ def main():
 
     interesting = []
     try:
-        with open(baseDirectory + "interesting.txt", "r") as file:
+        with open(base_directory + "interesting.txt", "r", encoding="ascii") as file:
             for line in file:
                 x = line.replace("\n", "")
                 if x != "":
@@ -228,20 +139,19 @@ def main():
     except:
         interesting = []
 
-    imgnames = sorted(glob.glob(baseDirectory + "*.jpg"))
+    imgnames = sorted(glob.glob(base_directory + "*.jpg"))
 
-    allItems = {}
+    all_items = {}
 
     for image_file in imgnames:
         decomp = os.path.basename(image_file)
         if decomp not in interesting:
-
-            raw_found = set(yolo.yolo_file(image_file,True))
-            found= raw_found & lifeforms
+            raw_found = set(yolo_file(decomp))
+            found = raw_found & lifeforms
 
             if found:
-                allItems = set(found).union(allItems)
-                print("#", image_file, " ", list(allItems))
+                all_items = set(found).union(all_items)
+                print("#", image_file, " ", list(all_items))
                 interesting.append(os.path.basename(image_file))
             else:
                 decomp = os.path.basename(image_file)
@@ -250,19 +160,20 @@ def main():
     # Write back list of items with interesting objects found in them
 
     try:
-        with open(baseDirectory + "interesting.txt", "w") as file:
+        with open(base_directory + "interesting.txt", "w", encoding="ascii") as file:
             file.write("\n".join(str(item) for item in interesting))
             file.close()
     except Exception as err:
         print("#", err)
         print("#Attempt to write file of interesting items locally\n")
         try:
-            with open("./interesting.txt", "w") as file:
+            with open("./interesting.txt", "w", encoding="ascii") as file:
                 file.write("\n".join(str(item) for item in interesting))
                 file.close()
-        except Exception as err:
-            print(err)
+        except Exception as err2:
+            print(err2)
 
 
 if __name__ == "__main__":
     main()
+
